@@ -1,4 +1,4 @@
-﻿# Lower 48 Warlines
+# Lower 48 Warlines
 
 High-feature browser strategy game where all 48 contiguous US states start in active war.
 
@@ -62,3 +62,9 @@ http://127.0.0.1:8100
 
 - This is a strategic simulation, not a geographic projection-accurate map.
 - State placement is optimized for fast readability and gameplay clarity.
+
+## Portfolio Positioning
+
+- Project type: Browser strategy simulation (HTML, CSS, JavaScript)
+- Verification path: Open index.html and run multiple turns plus save/load cycle.
+
