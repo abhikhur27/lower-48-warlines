@@ -1,0 +1,116 @@
+﻿<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Lower 48 Warlines</title>
+  <meta name="description" content="Strategic browser war simulation across all 48 contiguous US states." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=Spectral:wght@500;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <main class="shell">
+    <header class="topbar panel">
+      <div>
+        <p class="eyebrow">War Engine</p>
+        <h1>Lower 48 Warlines</h1>
+        <p class="lede">All contiguous states are in open conflict. Alaska and Hawaii are reserved for a future theater expansion.</p>
+      </div>
+      <div class="status-grid">
+        <div class="stat">
+          <span class="label">Turn</span>
+          <span id="turn-count" class="value">1</span>
+        </div>
+        <div class="stat">
+          <span class="label">Your Faction</span>
+          <span id="player-name" class="value">-</span>
+        </div>
+        <div class="stat">
+          <span class="label">Territories</span>
+          <span id="player-territories" class="value">-</span>
+        </div>
+        <div class="stat">
+          <span class="label">War Status</span>
+          <span id="war-status" class="value">Live</span>
+        </div>
+      </div>
+    </header>
+
+    <section class="layout">
+      <section class="panel controls">
+        <h2>Command Desk</h2>
+
+        <label for="start-state">Select your starting state</label>
+        <select id="start-state"></select>
+        <button id="start-game" class="primary">Start New Campaign</button>
+
+        <div class="control-block">
+          <h3>National Doctrine</h3>
+          <select id="doctrine">
+            <option value="balanced">Balanced Doctrine</option>
+            <option value="blitz">Blitz Doctrine</option>
+            <option value="fortress">Fortress Doctrine</option>
+          </select>
+        </div>
+
+        <div class="control-block">
+          <h3>Budget Allocation</h3>
+          <label>Military <input id="budget-military" type="range" min="20" max="70" value="45" /></label>
+          <label>Science <input id="budget-science" type="range" min="10" max="50" value="25" /></label>
+          <label>Civil Stability <input id="budget-civil" type="range" min="10" max="50" value="30" /></label>
+          <p id="budget-readout" class="muted">Military 45% | Science 25% | Civil 30%</p>
+        </div>
+
+        <div class="control-block">
+          <h3>Targeted Offensive</h3>
+          <select id="offensive-target"></select>
+          <button id="launch-offensive">Launch Offensive</button>
+        </div>
+
+        <div class="button-row">
+          <button id="end-turn" class="primary">Process Turn</button>
+          <button id="auto-run">Auto Run: Off</button>
+        </div>
+
+        <div class="button-row">
+          <button id="save-state">Save</button>
+          <button id="load-state">Load</button>
+          <button id="reset-state">Reset</button>
+        </div>
+      </section>
+
+      <section class="panel map-wrap">
+        <div class="map-head">
+          <h2>Continental Theater</h2>
+          <p class="muted">Click any state tile for detailed intelligence.</p>
+        </div>
+        <div id="state-map" class="state-map" aria-label="Strategic state map"></div>
+      </section>
+
+      <section class="panel intel">
+        <h2>Intel Feed</h2>
+        <div id="selected-state" class="selected-state">Select a state on the map to inspect it.</div>
+
+        <h3>Top Factions</h3>
+        <table>
+          <thead>
+            <tr>
+              <th>Faction</th>
+              <th>Territories</th>
+              <th>Power</th>
+            </tr>
+          </thead>
+          <tbody id="leaderboard"></tbody>
+        </table>
+
+        <h3>Event Log</h3>
+        <div id="event-log" class="event-log"></div>
+      </section>
+    </section>
+  </main>
+
+  <script src="script.js"></script>
+</body>
+</html>
