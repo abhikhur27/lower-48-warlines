@@ -3,113 +3,307 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Lower 48 Warlines</title>
-  <meta name="description" content="Strategic browser war simulation across all 48 contiguous US states." />
+  <title>Continental Feuds | Abhi's State War Simulator</title>
+  <meta name="description" content="Medieval-inspired strategic simulation across all 48 continental US states." />
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            parchment: '#efe5cc',
+            ink: '#1e1a16',
+            sepia: '#8c6f4f',
+            burgundy: '#6f2d2d',
+            olive: '#5d6a45'
+          },
+          boxShadow: {
+            ledger: '0 16px 45px rgba(40, 25, 11, 0.22)'
+          }
+        }
+      }
+    };
+  </script>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=Spectral:wght@500;700&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="styles.css" />
+  <link href="https://fonts.googleapis.com/css2?family=EB+Garamond:wght@500;600;700&family=Source+Sans+3:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <style>
+    body {
+      font-family: "Source Sans 3", sans-serif;
+      background:
+        radial-gradient(circle at 8% 5%, rgba(255, 255, 255, 0.35) 0%, transparent 34%),
+        radial-gradient(circle at 91% 12%, rgba(141, 104, 64, 0.18) 0%, transparent 30%),
+        #d6c5a9;
+      color: #231c14;
+      min-height: 100vh;
+    }
+
+    .font-chronicle {
+      font-family: "EB Garamond", Georgia, serif;
+    }
+
+    .grain::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      background-image:
+        radial-gradient(circle at 15% 20%, rgba(255, 255, 255, 0.08) 0 1px, transparent 1px),
+        radial-gradient(circle at 70% 40%, rgba(0, 0, 0, 0.045) 0 1px, transparent 1px),
+        radial-gradient(circle at 30% 80%, rgba(0, 0, 0, 0.035) 0 1px, transparent 1px);
+      background-size: 7px 7px, 9px 9px, 11px 11px;
+      mix-blend-mode: multiply;
+      opacity: 0.35;
+      z-index: 0;
+    }
+
+    #game-shell {
+      position: relative;
+      z-index: 1;
+    }
+
+    .paper-panel {
+      background: linear-gradient(165deg, rgba(255, 249, 236, 0.98), rgba(241, 229, 205, 0.94));
+      border: 1px solid rgba(84, 61, 36, 0.32);
+      box-shadow: 0 14px 30px rgba(67, 45, 20, 0.18);
+    }
+
+    .map-grid {
+      display: grid;
+      grid-template-columns: repeat(14, minmax(40px, 1fr));
+      grid-template-rows: repeat(9, 46px);
+      gap: 0.28rem;
+    }
+
+    .state-tile {
+      border: 1px solid rgba(27, 22, 16, 0.34);
+      border-radius: 0.48rem;
+      display: grid;
+      place-items: center;
+      font-size: 0.76rem;
+      font-weight: 700;
+      cursor: pointer;
+      transition: transform 120ms ease, filter 120ms ease;
+      color: #171109;
+      user-select: none;
+    }
+
+    .state-tile:hover {
+      transform: translateY(-1px);
+      filter: brightness(1.05);
+    }
+
+    .state-tile.player {
+      outline: 2px solid #1f1a12;
+      outline-offset: 1px;
+    }
+
+    .state-tile.frontline {
+      box-shadow: inset 0 0 0 2px rgba(111, 45, 45, 0.4);
+    }
+
+    .state-tile small {
+      font-size: 0.64rem;
+      font-weight: 700;
+      letter-spacing: 0.07em;
+      text-transform: uppercase;
+    }
+
+    .chronicle-scroll {
+      max-height: 26rem;
+      overflow: auto;
+      scrollbar-width: thin;
+    }
+
+    .loading-overlay {
+      position: fixed;
+      inset: 0;
+      background: linear-gradient(180deg, #f3e7cc 0%, #d6c1a1 100%);
+      display: grid;
+      place-items: center;
+      z-index: 60;
+      transition: opacity 550ms ease;
+    }
+
+    .loading-card {
+      width: min(660px, calc(100% - 2rem));
+      border: 1px solid rgba(66, 46, 23, 0.35);
+      background: rgba(255, 249, 239, 0.95);
+      box-shadow: 0 20px 40px rgba(66, 46, 23, 0.18);
+      border-radius: 0.9rem;
+      padding: 1rem;
+    }
+
+    .loading-log {
+      max-height: 180px;
+      overflow: auto;
+      font-size: 0.86rem;
+      line-height: 1.4;
+      border: 1px solid rgba(66, 46, 23, 0.25);
+      background: rgba(255, 254, 251, 0.8);
+      border-radius: 0.6rem;
+      padding: 0.65rem 0.7rem;
+    }
+
+    .hidden-soft {
+      opacity: 0;
+      pointer-events: none;
+    }
+
+    @media (max-width: 1180px) {
+      .layout-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .map-grid {
+        grid-template-columns: repeat(7, minmax(38px, 1fr));
+        grid-template-rows: none;
+        grid-auto-rows: 44px;
+      }
+
+      .state-tile {
+        grid-column: auto !important;
+        grid-row: auto !important;
+      }
+    }
+  </style>
 </head>
-<body>
-  <main class="shell">
-    <header class="topbar panel">
-      <div>
-        <p class="eyebrow">War Engine</p>
-        <h1>Lower 48 Warlines</h1>
-        <p class="lede">All contiguous states are in open conflict. Alaska and Hawaii are reserved for a future theater expansion.</p>
+<body class="grain">
+  <div id="loading-screen" class="loading-overlay">
+    <div class="loading-card">
+      <p class="uppercase tracking-[0.18em] text-xs font-semibold text-sepia">World Foundry</p>
+      <h2 class="font-chronicle text-3xl mb-2 text-ink">Continental Feuds</h2>
+      <p class="text-sm text-[#5f4d36] mb-3">Abhi's State War Simulator: validating assets, surveying borders, and drafting faction treaties.</p>
+      <div class="w-full h-3 rounded bg-[#d7c6ab] border border-[#8b6d4a]/40 overflow-hidden mb-3">
+        <div id="loading-bar" class="h-full bg-[#7d6142] w-0 transition-all duration-300"></div>
       </div>
-      <div class="status-grid">
-        <div class="stat">
-          <span class="label">Turn</span>
-          <span id="turn-count" class="value">1</span>
+      <div id="loading-log" class="loading-log"></div>
+    </div>
+  </div>
+
+  <main id="game-shell" class="w-[min(1540px,calc(100%-1.2rem))] mx-auto py-3">
+    <header class="paper-panel rounded-xl px-4 py-3 mb-3">
+      <div class="flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <p class="uppercase tracking-[0.2em] text-xs text-sepia font-semibold">Grand Campaign Ledger</p>
+          <h1 class="font-chronicle text-4xl leading-none text-ink">Continental Feuds</h1>
+          <p class="text-sm text-[#5f4d36] mt-1">Abhi's State War Simulator · 48 continental states in persistent conflict. Alaska and Hawaii arrive in a future update.</p>
         </div>
-        <div class="stat">
-          <span class="label">Your Faction</span>
-          <span id="player-name" class="value">-</span>
-        </div>
-        <div class="stat">
-          <span class="label">Territories</span>
-          <span id="player-territories" class="value">-</span>
-        </div>
-        <div class="stat">
-          <span class="label">War Status</span>
-          <span id="war-status" class="value">Live</span>
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-2 text-sm">
+          <div class="paper-panel rounded-lg px-3 py-2"><p class="text-[11px] uppercase tracking-[0.12em] text-sepia">Season</p><p id="season-count" class="font-semibold">1</p></div>
+          <div class="paper-panel rounded-lg px-3 py-2"><p class="text-[11px] uppercase tracking-[0.12em] text-sepia">Ruler</p><p id="player-faction" class="font-semibold">-</p></div>
+          <div class="paper-panel rounded-lg px-3 py-2"><p class="text-[11px] uppercase tracking-[0.12em] text-sepia">Holdings</p><p id="player-holdings" class="font-semibold">-</p></div>
+          <div class="paper-panel rounded-lg px-3 py-2"><p class="text-[11px] uppercase tracking-[0.12em] text-sepia">Campaign State</p><p id="campaign-state" class="font-semibold">Live</p></div>
         </div>
       </div>
     </header>
 
-    <section class="layout">
-      <section class="panel controls">
-        <h2>Command Desk</h2>
+    <section class="layout-grid grid grid-cols-[330px_1fr_360px] gap-3">
+      <aside class="paper-panel rounded-xl p-3">
+        <h2 class="font-chronicle text-2xl mb-2">Faction Ledger</h2>
 
-        <label for="start-state">Select your starting state</label>
-        <select id="start-state"></select>
-        <button id="start-game" class="primary">Start New Campaign</button>
+        <label class="text-sm font-semibold text-[#5f4d36]">Select Starting State</label>
+        <select id="start-state" class="w-full rounded-lg border border-[#8f7353]/45 bg-[#fffaf0] px-3 py-2 mt-1 mb-2"></select>
+        <button id="new-campaign" class="w-full rounded-lg border border-[#6a4f33] bg-[#7f6142] text-[#fff7ea] py-2 font-semibold">Begin New Chronicle</button>
 
-        <div class="control-block">
-          <h3>National Doctrine</h3>
-          <select id="doctrine">
-            <option value="balanced">Balanced Doctrine</option>
-            <option value="blitz">Blitz Doctrine</option>
-            <option value="fortress">Fortress Doctrine</option>
+        <div class="border-t border-[#947552]/35 mt-3 pt-3 space-y-2">
+          <h3 class="font-chronicle text-xl">Economy</h3>
+          <div class="grid grid-cols-3 gap-2 text-center">
+            <div class="paper-panel rounded-lg py-2"><p class="text-[11px] uppercase tracking-[0.1em] text-sepia">Gold</p><p id="gold-readout" class="font-semibold">0</p></div>
+            <div class="paper-panel rounded-lg py-2"><p class="text-[11px] uppercase tracking-[0.1em] text-sepia">Levies</p><p id="levy-readout" class="font-semibold">0</p></div>
+            <div class="paper-panel rounded-lg py-2"><p class="text-[11px] uppercase tracking-[0.1em] text-sepia">Rations</p><p id="ration-readout" class="font-semibold">0</p></div>
+          </div>
+          <p class="text-sm text-[#5f4d36]">Allocate treasury each season:</p>
+          <label class="text-sm">Levy Reinforcement <input id="alloc-levy" type="range" min="20" max="70" value="45" class="w-full" /></label>
+          <label class="text-sm">Siegeworks Funding <input id="alloc-siege" type="range" min="10" max="45" value="25" class="w-full" /></label>
+          <label class="text-sm">Civil Provisioning <input id="alloc-civil" type="range" min="10" max="50" value="30" class="w-full" /></label>
+          <p id="alloc-summary" class="text-xs text-[#6e583f]">Levies 45% · Siegeworks 25% · Civil 30%</p>
+        </div>
+
+        <div class="border-t border-[#947552]/35 mt-3 pt-3 space-y-2">
+          <h3 class="font-chronicle text-xl">War Doctrine</h3>
+          <select id="player-doctrine" class="w-full rounded-lg border border-[#8f7353]/45 bg-[#fffaf0] px-3 py-2">
+            <option value="fabian">Fabian Attrition</option>
+            <option value="feigned">Feigned Retreat</option>
+            <option value="siege">Siegeworks</option>
           </select>
+          <p id="doctrine-note" class="text-xs text-[#6e583f]"></p>
         </div>
 
-        <div class="control-block">
-          <h3>Budget Allocation</h3>
-          <label>Military <input id="budget-military" type="range" min="20" max="70" value="45" /></label>
-          <label>Science <input id="budget-science" type="range" min="10" max="50" value="25" /></label>
-          <label>Civil Stability <input id="budget-civil" type="range" min="10" max="50" value="30" /></label>
-          <p id="budget-readout" class="muted">Military 45% | Science 25% | Civil 30%</p>
+        <div class="border-t border-[#947552]/35 mt-3 pt-3 space-y-2">
+          <h3 class="font-chronicle text-xl">Action Queue</h3>
+          <select id="source-state" class="w-full rounded-lg border border-[#8f7353]/45 bg-[#fffaf0] px-3 py-2"></select>
+          <select id="target-state" class="w-full rounded-lg border border-[#8f7353]/45 bg-[#fffaf0] px-3 py-2"></select>
+          <button id="queue-campaign" class="w-full rounded-lg border border-[#6a4f33] bg-[#8f2f2f] text-[#fff7ea] py-2 font-semibold">Queue Campaign</button>
+          <div class="grid grid-cols-2 gap-2">
+            <button id="advance-season" class="rounded-lg border border-[#6a4f33] bg-[#7f6142] text-[#fff7ea] py-2 font-semibold">Advance Season</button>
+            <button id="toggle-auto" class="rounded-lg border border-[#8f7353] bg-[#f1e5cf] text-[#4f3c27] py-2 font-semibold">Auto: Off</button>
+          </div>
+          <button id="open-settings" class="w-full rounded-lg border border-[#8f7353] bg-[#f1e5cf] text-[#4f3c27] py-2 font-semibold">Settings</button>
         </div>
+      </aside>
 
-        <div class="control-block">
-          <h3>Targeted Offensive</h3>
-          <select id="offensive-target"></select>
-          <button id="launch-offensive">Launch Offensive</button>
+      <section class="paper-panel rounded-xl p-3">
+        <div class="flex items-end justify-between gap-2 mb-2">
+          <div>
+            <h2 class="font-chronicle text-2xl">Tactical Map</h2>
+            <p class="text-sm text-[#5f4d36]">State control bars show manor influence split. Ownership shifts incrementally by campaign pressure.</p>
+          </div>
+          <div class="text-xs text-[#6a5339] text-right">
+            <p><strong>Fog of War:</strong> exact enemy troop counts visible only for adjacent borders.</p>
+          </div>
         </div>
-
-        <div class="button-row">
-          <button id="end-turn" class="primary">Process Turn</button>
-          <button id="auto-run">Auto Run: Off</button>
-        </div>
-
-        <div class="button-row">
-          <button id="save-state">Save</button>
-          <button id="load-state">Load</button>
-          <button id="reset-state">Reset</button>
-        </div>
+        <div id="map-grid" class="map-grid"></div>
       </section>
 
-      <section class="panel map-wrap">
-        <div class="map-head">
-          <h2>Continental Theater</h2>
-          <p class="muted">Click any state tile for detailed intelligence.</p>
+      <aside class="paper-panel rounded-xl p-3">
+        <h2 class="font-chronicle text-2xl mb-2">War Room & Chronicle</h2>
+
+        <div id="state-inspector" class="border border-[#8f7353]/35 rounded-lg bg-[#fff9ee] p-2 text-sm mb-2 text-[#4c3a27]">
+          Select a territory to inspect manor control, supply line, and defensive doctrine.
         </div>
-        <div id="state-map" class="state-map" aria-label="Strategic state map"></div>
-      </section>
 
-      <section class="panel intel">
-        <h2>Intel Feed</h2>
-        <div id="selected-state" class="selected-state">Select a state on the map to inspect it.</div>
-
-        <h3>Top Factions</h3>
-        <table>
+        <h3 class="font-chronicle text-xl">Dominant Factions</h3>
+        <table class="w-full text-sm mb-2">
           <thead>
-            <tr>
-              <th>Faction</th>
-              <th>Territories</th>
-              <th>Power</th>
+            <tr class="text-left border-b border-[#8f7353]/35 text-[#6d563c]">
+              <th class="py-1">Faction</th>
+              <th class="py-1">States</th>
+              <th class="py-1">War Power</th>
             </tr>
           </thead>
-          <tbody id="leaderboard"></tbody>
+          <tbody id="faction-table"></tbody>
         </table>
 
-        <h3>Event Log</h3>
-        <div id="event-log" class="event-log"></div>
-      </section>
+        <h3 class="font-chronicle text-xl">Live Chronicle</h3>
+        <div id="chronicle-log" class="chronicle-scroll space-y-1"></div>
+      </aside>
     </section>
   </main>
+
+  <div id="settings-modal" class="fixed inset-0 z-50 hidden items-center justify-center bg-black/40 p-4">
+    <div class="paper-panel rounded-xl w-[min(680px,100%)] p-4">
+      <div class="flex items-center justify-between mb-3">
+        <h2 class="font-chronicle text-2xl">Campaign Settings</h2>
+        <button id="close-settings" class="rounded border border-[#8f7353]/45 px-3 py-1">Close</button>
+      </div>
+      <div class="grid md:grid-cols-2 gap-3">
+        <section class="border border-[#8f7353]/35 rounded-lg p-3 bg-[#fff9ee]">
+          <h3 class="font-chronicle text-xl mb-2">Save Control</h3>
+          <p class="text-sm text-[#5f4d36] mb-2">The game auto-saves each season to localStorage.</p>
+          <div class="grid grid-cols-2 gap-2">
+            <button id="export-save" class="rounded-lg border border-[#6a4f33] bg-[#7f6142] text-[#fff7ea] py-2 font-semibold">Export Save</button>
+            <button id="wipe-save" class="rounded-lg border border-[#8f7353] bg-[#f1e5cf] text-[#4f3c27] py-2 font-semibold">Wipe Save</button>
+          </div>
+        </section>
+        <section class="border border-[#8f7353]/35 rounded-lg p-3 bg-[#fff9ee]">
+          <h3 class="font-chronicle text-xl mb-2">Import Save</h3>
+          <input id="import-file" type="file" accept="application/json" class="w-full mb-2" />
+          <button id="import-save" class="w-full rounded-lg border border-[#6a4f33] bg-[#7f6142] text-[#fff7ea] py-2 font-semibold">Import Campaign</button>
+        </section>
+      </div>
+    </div>
+  </div>
 
   <script src="script.js"></script>
 </body>
