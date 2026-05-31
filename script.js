@@ -1,1639 +1,1846 @@
 (() => {
   'use strict';
 
-  const DATA = (() => {
-    const STATES = [
-      { id: 'WA', name: 'Washington', x: 1, y: 1, region: 'West', terrain: 'coastal', neighbors: ['OR', 'ID'] },
-      { id: 'OR', name: 'Oregon', x: 1, y: 2, region: 'West', terrain: 'coastal', neighbors: ['WA', 'ID', 'NV', 'CA'] },
-      { id: 'CA', name: 'California', x: 1, y: 4, region: 'West', terrain: 'coastal', neighbors: ['OR', 'NV', 'AZ'] },
-      { id: 'NV', name: 'Nevada', x: 2, y: 3, region: 'West', terrain: 'desert', neighbors: ['OR', 'ID', 'UT', 'AZ', 'CA'] },
-      { id: 'ID', name: 'Idaho', x: 2, y: 1, region: 'West', terrain: 'mountain', neighbors: ['WA', 'OR', 'NV', 'UT', 'WY', 'MT'] },
-      { id: 'UT', name: 'Utah', x: 3, y: 3, region: 'West', terrain: 'mountain', neighbors: ['ID', 'WY', 'CO', 'NM', 'AZ', 'NV'] },
-      { id: 'AZ', name: 'Arizona', x: 2, y: 5, region: 'West', terrain: 'desert', neighbors: ['CA', 'NV', 'UT', 'NM', 'CO'] },
-      { id: 'MT', name: 'Montana', x: 3, y: 1, region: 'West', terrain: 'mountain', neighbors: ['ID', 'WY', 'SD', 'ND'] },
-      { id: 'WY', name: 'Wyoming', x: 4, y: 2, region: 'West', terrain: 'mountain', neighbors: ['MT', 'SD', 'NE', 'CO', 'UT', 'ID'] },
-      { id: 'CO', name: 'Colorado', x: 4, y: 3, region: 'West', terrain: 'mountain', neighbors: ['WY', 'NE', 'KS', 'OK', 'NM', 'AZ', 'UT'] },
-      { id: 'NM', name: 'New Mexico', x: 4, y: 5, region: 'West', terrain: 'desert', neighbors: ['AZ', 'UT', 'CO', 'OK', 'TX'] },
-      { id: 'ND', name: 'North Dakota', x: 5, y: 1, region: 'Plains', terrain: 'plains', neighbors: ['MT', 'SD', 'MN'] },
-      { id: 'SD', name: 'South Dakota', x: 5, y: 2, region: 'Plains', terrain: 'plains', neighbors: ['ND', 'MN', 'IA', 'NE', 'WY', 'MT'] },
-      { id: 'NE', name: 'Nebraska', x: 5, y: 3, region: 'Plains', terrain: 'plains', neighbors: ['SD', 'IA', 'MO', 'KS', 'CO', 'WY'] },
-      { id: 'KS', name: 'Kansas', x: 5, y: 4, region: 'Plains', terrain: 'plains', neighbors: ['NE', 'MO', 'OK', 'CO'] },
-      { id: 'OK', name: 'Oklahoma', x: 5, y: 5, region: 'Plains', terrain: 'plains', neighbors: ['CO', 'KS', 'MO', 'AR', 'TX', 'NM'] },
-      { id: 'TX', name: 'Texas', x: 5, y: 6, region: 'Plains', terrain: 'plains', neighbors: ['NM', 'OK', 'AR', 'LA'] },
-      { id: 'MN', name: 'Minnesota', x: 6, y: 1, region: 'Midwest', terrain: 'forest', neighbors: ['ND', 'SD', 'IA', 'WI'] },
-      { id: 'IA', name: 'Iowa', x: 6, y: 3, region: 'Midwest', terrain: 'plains', neighbors: ['MN', 'SD', 'NE', 'MO', 'IL', 'WI'] },
-      { id: 'MO', name: 'Missouri', x: 6, y: 4, region: 'Midwest', terrain: 'forest', neighbors: ['IA', 'IL', 'KY', 'TN', 'AR', 'OK', 'KS', 'NE'] },
-      { id: 'AR', name: 'Arkansas', x: 6, y: 5, region: 'South', terrain: 'forest', neighbors: ['TX', 'OK', 'MO', 'TN', 'MS', 'LA'] },
-      { id: 'LA', name: 'Louisiana', x: 6, y: 6, region: 'South', terrain: 'coastal', neighbors: ['TX', 'AR', 'MS'] },
-      { id: 'WI', name: 'Wisconsin', x: 7, y: 2, region: 'Midwest', terrain: 'forest', neighbors: ['MI', 'MN', 'IA', 'IL'] },
-      { id: 'IL', name: 'Illinois', x: 7, y: 3, region: 'Midwest', terrain: 'plains', neighbors: ['WI', 'IA', 'MO', 'KY', 'IN'] },
-      { id: 'MS', name: 'Mississippi', x: 7, y: 6, region: 'South', terrain: 'forest', neighbors: ['LA', 'AR', 'TN', 'AL'] },
-      { id: 'MI', name: 'Michigan', x: 8, y: 1, region: 'Midwest', terrain: 'forest', neighbors: ['WI', 'IN', 'OH'] },
-      { id: 'IN', name: 'Indiana', x: 8, y: 3, region: 'Midwest', terrain: 'plains', neighbors: ['MI', 'OH', 'KY', 'IL'] },
-      { id: 'KY', name: 'Kentucky', x: 8, y: 4, region: 'South', terrain: 'hills', neighbors: ['IL', 'IN', 'OH', 'WV', 'VA', 'TN', 'MO'] },
-      { id: 'TN', name: 'Tennessee', x: 8, y: 5, region: 'South', terrain: 'hills', neighbors: ['KY', 'VA', 'NC', 'GA', 'AL', 'MS', 'AR', 'MO'] },
-      { id: 'AL', name: 'Alabama', x: 8, y: 6, region: 'South', terrain: 'coastal', neighbors: ['FL', 'GA', 'TN', 'MS'] },
-      { id: 'OH', name: 'Ohio', x: 9, y: 3, region: 'Midwest', terrain: 'plains', neighbors: ['PA', 'WV', 'KY', 'IN', 'MI'] },
-      { id: 'WV', name: 'West Virginia', x: 9, y: 4, region: 'South', terrain: 'hills', neighbors: ['OH', 'PA', 'MD', 'VA', 'KY'] },
-      { id: 'GA', name: 'Georgia', x: 9, y: 6, region: 'South', terrain: 'coastal', neighbors: ['FL', 'AL', 'TN', 'NC', 'SC'] },
-      { id: 'FL', name: 'Florida', x: 10, y: 7, region: 'South', terrain: 'coastal', neighbors: ['AL', 'GA'] },
-      { id: 'SC', name: 'South Carolina', x: 10, y: 6, region: 'South', terrain: 'coastal', neighbors: ['GA', 'NC'] },
-      { id: 'NC', name: 'North Carolina', x: 10, y: 5, region: 'South', terrain: 'coastal', neighbors: ['VA', 'TN', 'GA', 'SC'] },
-      { id: 'VA', name: 'Virginia', x: 10, y: 4, region: 'South', terrain: 'coastal', neighbors: ['MD', 'WV', 'KY', 'TN', 'NC'] },
-      { id: 'PA', name: 'Pennsylvania', x: 11, y: 3, region: 'East', terrain: 'hills', neighbors: ['NY', 'NJ', 'DE', 'MD', 'WV', 'OH'] },
-      { id: 'NY', name: 'New York', x: 11, y: 2, region: 'East', terrain: 'hills', neighbors: ['PA', 'NJ', 'CT', 'MA', 'VT'] },
-      { id: 'MA', name: 'Massachusetts', x: 13, y: 2, region: 'East', terrain: 'coastal', neighbors: ['NY', 'VT', 'NH', 'CT', 'RI'] },
-      { id: 'VT', name: 'Vermont', x: 12, y: 1, region: 'East', terrain: 'hills', neighbors: ['NY', 'NH', 'MA'] },
-      { id: 'NH', name: 'New Hampshire', x: 13, y: 1, region: 'East', terrain: 'hills', neighbors: ['ME', 'MA', 'VT'] },
-      { id: 'ME', name: 'Maine', x: 14, y: 1, region: 'East', terrain: 'forest', neighbors: ['NH'] },
-      { id: 'NJ', name: 'New Jersey', x: 12, y: 3, region: 'East', terrain: 'coastal', neighbors: ['NY', 'PA', 'DE'] },
-      { id: 'DE', name: 'Delaware', x: 12, y: 4, region: 'East', terrain: 'coastal', neighbors: ['MD', 'NJ', 'PA'] },
-      { id: 'MD', name: 'Maryland', x: 11, y: 4, region: 'East', terrain: 'coastal', neighbors: ['VA', 'WV', 'PA', 'DE'] },
-      { id: 'CT', name: 'Connecticut', x: 12, y: 2, region: 'East', terrain: 'coastal', neighbors: ['NY', 'MA', 'RI'] },
-      { id: 'RI', name: 'Rhode Island', x: 14, y: 2, region: 'East', terrain: 'coastal', neighbors: ['CT', 'MA'] },
-    ];
+  const STORAGE_KEY = 'abhi_state_war_sim_campaign_v3';
+  const SAVE_VERSION = 3;
 
-    const TERRAIN = {
-      plains: { defense: 1.0, supply: 1.03, yield: 1.02 },
-      coastal: { defense: 1.05, supply: 1.0, yield: 1.04 },
-      forest: { defense: 1.09, supply: 0.96, yield: 1.01 },
-      hills: { defense: 1.13, supply: 0.92, yield: 0.98 },
-      mountain: { defense: 1.17, supply: 0.88, yield: 0.95 },
-      desert: { defense: 1.03, supply: 0.86, yield: 0.93 },
-    };
+  const CONTIGUOUS_FIPS = new Set([
+    '01', '04', '05', '06', '08', '09', '10', '12', '13', '16', '17', '18', '19', '20', '21', '22', '23', '24',
+    '25', '26', '27', '28', '29', '30', '31', '32', '33', '34', '35', '36', '37', '38', '39', '40', '41', '42',
+    '44', '45', '46', '47', '48', '49', '50', '51', '53', '54', '55', '56',
+  ]);
 
-    const DOCTRINES = {
-      fabian: {
-        key: 'fabian',
-        label: 'Fabian Attrition',
-        attack: 0.92,
-        defense: 1.16,
-        siege: 0.94,
-        supply: 1.12,
-        detail: 'Delay and drain the invader. Strong defensive depth and supply retention.',
-      },
-      feigned: {
-        key: 'feigned',
-        label: 'Feigned Retreat',
-        attack: 1.08,
-        defense: 0.97,
-        siege: 0.98,
-        supply: 0.99,
-        detail: 'Lure forces out of posture then counter. High maneuver and opportunistic strikes.',
-      },
-      siege: {
-        key: 'siege',
-        label: 'Siegeworks',
-        attack: 1.01,
-        defense: 1.03,
-        siege: 1.17,
-        supply: 0.94,
-        detail: 'Engineers and fort-breakers. Best at sustained control transfer in fortified states.',
-      },
-    };
+  const STATE_ABBR_BY_FIPS = {
+    '01': 'AL', '02': 'AK', '04': 'AZ', '05': 'AR', '06': 'CA', '08': 'CO', '09': 'CT', '10': 'DE', '11': 'DC',
+    '12': 'FL', '13': 'GA', '15': 'HI', '16': 'ID', '17': 'IL', '18': 'IN', '19': 'IA', '20': 'KS', '21': 'KY',
+    '22': 'LA', '23': 'ME', '24': 'MD', '25': 'MA', '26': 'MI', '27': 'MN', '28': 'MS', '29': 'MO', '30': 'MT',
+    '31': 'NE', '32': 'NV', '33': 'NH', '34': 'NJ', '35': 'NM', '36': 'NY', '37': 'NC', '38': 'ND', '39': 'OH',
+    '40': 'OK', '41': 'OR', '42': 'PA', '44': 'RI', '45': 'SC', '46': 'SD', '47': 'TN', '48': 'TX', '49': 'UT',
+    '50': 'VT', '51': 'VA', '53': 'WA', '54': 'WV', '55': 'WI', '56': 'WY',
+  };
 
-    const DOCTRINE_COUNTERS = {
-      fabian: 'feigned',
-      feigned: 'siege',
-      siege: 'fabian',
-    };
+  const REGION_BY_ABBR = {
+    WA: 'West', OR: 'West', CA: 'West', NV: 'West', ID: 'West', UT: 'West', AZ: 'West', MT: 'West', WY: 'West', CO: 'West', NM: 'West',
+    ND: 'Plains', SD: 'Plains', NE: 'Plains', KS: 'Plains', OK: 'Plains', TX: 'Plains',
+    MN: 'Midwest', IA: 'Midwest', MO: 'Midwest', WI: 'Midwest', IL: 'Midwest', MI: 'Midwest', IN: 'Midwest', OH: 'Midwest',
+    AR: 'South', LA: 'South', MS: 'South', KY: 'South', TN: 'South', AL: 'South', WV: 'South', GA: 'South', FL: 'South', SC: 'South', NC: 'South', VA: 'South',
+    PA: 'East', NY: 'East', VT: 'East', NH: 'East', ME: 'East', NJ: 'East', DE: 'East', MD: 'East', CT: 'East', RI: 'East', MA: 'East',
+  };
 
-    const TRAITS = [
-      {
-        id: 'agrarian',
-        name: 'Granary Charters',
-        summary: '+14% ration yield, +4% civil stability gain.',
-        regions: ['Plains', 'Midwest', 'South'],
-        effect: { ration: 1.14, civil: 1.04, levy: 1.0, siege: 1.0, defense: 1.0, supply: 1.03 },
-      },
-      {
-        id: 'mountaineers',
-        name: 'Fierce Mountaineers',
-        summary: '+10% defense in hills/mountains, +6% attrition resistance.',
-        regions: ['West', 'East', 'South'],
-        effect: { ration: 1.0, civil: 1.0, levy: 1.0, siege: 0.98, defense: 1.06, supply: 1.06 },
-      },
-      {
-        id: 'riverlords',
-        name: 'Riverlord Caravans',
-        summary: '+12% gold yield, +5% supply flow.',
-        regions: ['Midwest', 'South', 'East'],
-        effect: { ration: 1.02, civil: 1.08, levy: 1.0, siege: 1.0, defense: 1.0, supply: 1.05 },
-      },
-      {
-        id: 'ironforges',
-        name: 'Ironforge Guilds',
-        summary: '+11% levy reinforcement, +5% siege pressure.',
-        regions: ['Midwest', 'West', 'Plains'],
-        effect: { ration: 0.98, civil: 1.0, levy: 1.11, siege: 1.05, defense: 1.0, supply: 1.0 },
-      },
-      {
-        id: 'borderraiders',
-        name: 'Border Raider Hosts',
-        summary: '+9% attack push, -4% civil output.',
-        regions: ['West', 'South', 'Plains'],
-        effect: { ration: 0.98, civil: 0.96, levy: 1.05, siege: 1.03, defense: 1.0, supply: 1.0 },
-      },
-      {
-        id: 'clerks',
-        name: 'Ledgered Chanceries',
-        summary: '+10% civil output and steadier doctrine adaptation.',
-        regions: ['East', 'Midwest'],
-        effect: { ration: 1.01, civil: 1.1, levy: 0.99, siege: 1.0, defense: 1.02, supply: 1.0 },
-      },
-    ];
+  const DOCTRINES = {
+    fabian: {
+      key: 'fabian',
+      label: 'Fabian Attrition',
+      attack: 0.92,
+      defense: 1.17,
+      siege: 0.96,
+      supply: 1.15,
+      note: 'Deliberate withdrawals that bleed invaders and preserve supply depth.',
+    },
+    feigned: {
+      key: 'feigned',
+      label: 'Feigned Retreat',
+      attack: 1.09,
+      defense: 0.98,
+      siege: 0.99,
+      supply: 0.98,
+      note: 'Bait-and-counter warfare with sharper offensive swings.',
+    },
+    siege: {
+      key: 'siege',
+      label: 'Siegeworks',
+      attack: 1.02,
+      defense: 1.04,
+      siege: 1.18,
+      supply: 0.94,
+      note: 'Engineer-heavy campaigns that accelerate control transfer in hard targets.',
+    },
+  };
 
-    const REGION_NAMING = {
-      West: {
-        adjectives: ['Frontier', 'Sierra', 'High Mesa', 'Sunset Range', 'Cinder Canyon'],
-        nouns: ['Marches', 'Compact', 'Wardens', 'League', 'Dominion'],
-      },
-      Plains: {
-        adjectives: ['Prairie', 'Longhorn', 'Dustwind', 'Great Plain', 'Red River'],
-        nouns: ['Confederacy', 'Sultanate', 'Host', 'Union', 'Stewardship'],
-      },
-      Midwest: {
-        adjectives: ['Rust-Belt', 'Lakeshore', 'Iron Prairie', 'Grain Crown', 'Heartland'],
-        nouns: ['Hegemony', 'Consortium', 'Tribunal', 'Cantons', 'Compact'],
-      },
-      South: {
-        adjectives: ['Appalachian', 'Delta', 'Magnolia', 'Cypress', 'Gulfward'],
-        nouns: ['Clans', 'Bannerholds', 'Dominion', 'League', 'Regency'],
-      },
-      East: {
-        adjectives: ['Old Dominion', 'Harbor', 'Atlantic', 'Granite', 'Charter'],
-        nouns: ['Synod', 'Commonwealth', 'Ward', 'Order', 'Hegemony'],
-      },
-    };
+  const DOCTRINE_COUNTER = {
+    fabian: 'feigned',
+    feigned: 'siege',
+    siege: 'fabian',
+  };
 
-    const PALETTE = ['#b1623f', '#486141', '#8d3f34', '#6e5a39', '#3d6074', '#7a4e68', '#5f4a82', '#6f4e2a', '#4c6b5b'];
-    const STORAGE_KEY = 'continental_feuds_campaign_v2';
-    const SAVE_VERSION = 2;
-    const LOOKUP = Object.fromEntries(STATES.map((state) => [state.id, state]));
+  const TRAITS = [
+    {
+      id: 'granary',
+      name: 'Granary Charters',
+      regions: ['Plains', 'Midwest', 'South'],
+      effect: { levy: 1.0, gold: 1.0, ration: 1.16, defense: 1.0, siege: 1.0, supply: 1.04 },
+      summary: 'Richer harvest reserves sustain long campaigns.',
+    },
+    {
+      id: 'mountain',
+      name: 'Fierce Mountaineers',
+      regions: ['West', 'East', 'South'],
+      effect: { levy: 1.02, gold: 0.99, ration: 1.0, defense: 1.08, siege: 0.97, supply: 1.06 },
+      summary: 'Excellent defensive doctrine in rough terrain.',
+    },
+    {
+      id: 'ledger',
+      name: 'Ledgered Chanceries',
+      regions: ['East', 'Midwest'],
+      effect: { levy: 1.0, gold: 1.13, ration: 1.02, defense: 1.02, siege: 1.0, supply: 1.01 },
+      summary: 'Disciplined civil bureaus produce stable treasury growth.',
+    },
+    {
+      id: 'forge',
+      name: 'Ironforge Guilds',
+      regions: ['West', 'Midwest', 'Plains'],
+      effect: { levy: 1.11, gold: 1.0, ration: 0.98, defense: 1.0, siege: 1.07, supply: 1.0 },
+      summary: 'Strong levy reinforcement and siege production.',
+    },
+    {
+      id: 'raiders',
+      name: 'Border Raider Hosts',
+      regions: ['South', 'West', 'Plains'],
+      effect: { levy: 1.07, gold: 0.98, ration: 0.98, defense: 0.98, siege: 1.05, supply: 0.99 },
+      summary: 'Fast, aggressive border action with high campaign tempo.',
+    },
+  ];
 
-    return {
-      STATES,
-      LOOKUP,
-      TERRAIN,
-      DOCTRINES,
-      DOCTRINE_COUNTERS,
-      TRAITS,
-      REGION_NAMING,
-      PALETTE,
-      STORAGE_KEY,
-      SAVE_VERSION,
-    };
-  })();
+  const FACTION_NAME_KITS = {
+    West: {
+      adjectives: ['Sierra', 'Frontier', 'Red Canyon', 'Sunset Range', 'High Mesa'],
+      nouns: ['Marches', 'League', 'Dominion', 'Wardens', 'Compact'],
+    },
+    Plains: {
+      adjectives: ['Prairie', 'Dustwind', 'Longhorn', 'Great River', 'Red Steppe'],
+      nouns: ['Confederacy', 'Host', 'Sultanate', 'Union', 'Stewardship'],
+    },
+    Midwest: {
+      adjectives: ['Rust-Belt', 'Lakeshore', 'Iron Prairie', 'Heartland', 'Grain Crown'],
+      nouns: ['Hegemony', 'Consortium', 'Tribunal', 'Compact', 'Cantons'],
+    },
+    South: {
+      adjectives: ['Appalachian', 'Cypress', 'Delta', 'Magnolia', 'Gulfward'],
+      nouns: ['Clans', 'Bannerholds', 'Regency', 'League', 'Dominion'],
+    },
+    East: {
+      adjectives: ['Granite', 'Atlantic', 'Harbor', 'Charter', 'Old Dominion'],
+      nouns: ['Commonwealth', 'Order', 'Ward', 'Synod', 'Hegemony'],
+    },
+  };
 
-  const UTIL = (() => {
-    function clamp(value, min, max) {
-      return Math.max(min, Math.min(max, value));
+  const FACTION_COLORS = [
+    '#b76a49',
+    '#4f6a45',
+    '#8d4740',
+    '#736145',
+    '#58718a',
+    '#86576f',
+    '#5e5387',
+    '#6e4f2f',
+    '#507165',
+  ];
+
+  const TERRAIN_BY_REGION = {
+    West: 'mountain',
+    Plains: 'plains',
+    Midwest: 'forest',
+    South: 'hills',
+    East: 'coastal',
+  };
+
+  const TERRAIN_MODIFIERS = {
+    plains: { defense: 1.0, supply: 1.03, prosperity: 1.03 },
+    coastal: { defense: 1.06, supply: 1.01, prosperity: 1.05 },
+    forest: { defense: 1.1, supply: 0.98, prosperity: 1.0 },
+    hills: { defense: 1.12, supply: 0.93, prosperity: 0.98 },
+    mountain: { defense: 1.17, supply: 0.88, prosperity: 0.96 },
+  };
+
+  const ROOT = document.getElementById('game-root');
+  const SVG = document.getElementById('war-map');
+  const CAMERA_GROUP = document.getElementById('camera-group');
+  const FILL_LAYER = document.getElementById('state-fill-layer');
+  const BORDER_LAYER = document.getElementById('state-border-layer');
+  const LABEL_LAYER = document.getElementById('state-label-layer');
+  const VECTOR_LAYER = document.getElementById('vector-layer');
+  const ASH_CANVAS = document.getElementById('ash-canvas');
+
+  const EL = {
+    startState: document.getElementById('start-state'),
+    newCampaign: document.getElementById('new-campaign'),
+    playerDoctrine: document.getElementById('player-doctrine'),
+    campaignDoctrine: document.getElementById('campaign-doctrine'),
+    doctrineNote: document.getElementById('doctrine-note'),
+    allocLevies: document.getElementById('alloc-levies'),
+    allocSiege: document.getElementById('alloc-siege'),
+    allocCivil: document.getElementById('alloc-civil'),
+    allocLeviesReadout: document.getElementById('alloc-levies-readout'),
+    allocSiegeReadout: document.getElementById('alloc-siege-readout'),
+    allocCivilReadout: document.getElementById('alloc-civil-readout'),
+    sourceState: document.getElementById('source-state'),
+    targetState: document.getElementById('target-state'),
+    queueCampaign: document.getElementById('queue-campaign'),
+    advanceSeason: document.getElementById('advance-season'),
+    toggleAuto: document.getElementById('toggle-auto'),
+    actionQueue: document.getElementById('action-queue'),
+    chronicleLog: document.getElementById('chronicle-log'),
+    metricLevies: document.getElementById('metric-levies'),
+    metricGold: document.getElementById('metric-gold'),
+    metricRations: document.getElementById('metric-rations'),
+    metricSeason: document.getElementById('metric-season'),
+    metricRealm: document.getElementById('metric-realm'),
+    metricHoldings: document.getElementById('metric-holdings'),
+    metricStatus: document.getElementById('metric-status'),
+    theaterTitle: document.getElementById('theater-title'),
+    theaterOwner: document.getElementById('theater-owner'),
+    theaterPressure: document.getElementById('theater-pressure'),
+    theaterPressureReadout: document.getElementById('theater-pressure-readout'),
+    theaterControlLedger: document.getElementById('theater-control-ledger'),
+    openSettings: document.getElementById('open-settings'),
+    closeSettings: document.getElementById('close-settings'),
+    settingsOverlay: document.getElementById('settings-overlay'),
+    exportSave: document.getElementById('export-save'),
+    importSave: document.getElementById('import-save'),
+    importFile: document.getElementById('import-file'),
+    wipeSave: document.getElementById('wipe-save'),
+    tutorialOverlay: document.getElementById('tutorial-overlay'),
+    tutorialText: document.getElementById('tutorial-text'),
+    tutorialBack: document.getElementById('tutorial-back'),
+    tutorialNext: document.getElementById('tutorial-next'),
+    tutorialClose: document.getElementById('tutorial-close'),
+    toggleWarRoom: document.getElementById('toggle-war-room'),
+    toggleChronicle: document.getElementById('toggle-chronicle'),
+    toggleDeclarations: document.getElementById('toggle-declarations'),
+    toggleTheater: document.getElementById('toggle-theater'),
+    panelWarRoom: document.getElementById('hud-war-room'),
+    panelChronicle: document.getElementById('hud-chronicle'),
+    panelDeclarations: document.getElementById('hud-declarations'),
+    panelTheater: document.getElementById('hud-theater'),
+  };
+
+  const tutorialSteps = [
+    {
+      text: 'Welcome, Commander. Select your ancestral realm and begin your first campaign.',
+      target: EL.startState,
+    },
+    {
+      text: 'The War Room controls doctrine and royal allocation. These values alter every seasonal resolution.',
+      target: EL.panelWarRoom,
+    },
+    {
+      text: 'Seasonal Declarations queue maneuvers. You can stage multiple campaigns before advancing the season.',
+      target: EL.panelDeclarations,
+    },
+    {
+      text: 'The Chronicle records border shifts, attrition, and doctrine outcomes each turn.',
+      target: EL.panelChronicle,
+    },
+  ];
+
+  const mapModel = {
+    states: [],
+    statesById: {},
+    projection: null,
+    pathGenerator: null,
+    bounds: { minX: 0, minY: 0, maxX: 1200, maxY: 760 },
+  };
+
+  let campaign = null;
+  let autoTimer = null;
+  let tutorialIndex = 0;
+
+  let camera = { x: 0, y: 0, scale: 1 };
+  let dragging = false;
+  let dragStart = { x: 0, y: 0, camX: 0, camY: 0 };
+
+  const particles = [];
+  let animationHandle = null;
+  let lastFrameTime = 0;
+
+  function clamp(value, min, max) {
+    return Math.max(min, Math.min(max, value));
+  }
+
+  function randInt(min, max) {
+    return Math.floor(Math.random() * (max - min + 1)) + min;
+  }
+
+  function randomItem(list) {
+    return list[Math.floor(Math.random() * list.length)];
+  }
+
+  function shuffle(list) {
+    const next = [...list];
+    for (let i = next.length - 1; i > 0; i -= 1) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [next[i], next[j]] = [next[j], next[i]];
     }
+    return next;
+  }
 
-    function randInt(min, max) {
-      return Math.floor(Math.random() * (max - min + 1)) + min;
-    }
+  function shortNumber(value) {
+    if (value >= 1000000) return `${(value / 1000000).toFixed(1)}m`;
+    if (value >= 1000) return `${(value / 1000).toFixed(1)}k`;
+    return String(Math.round(value));
+  }
 
-    function randomChoice(items) {
-      if (!items.length) return null;
-      return items[Math.floor(Math.random() * items.length)];
-    }
+  function toFixedPercent(value) {
+    return `${Math.round(value)}%`;
+  }
 
-    function shuffle(array) {
-      const next = [...array];
-      for (let i = next.length - 1; i > 0; i -= 1) {
-        const j = Math.floor(Math.random() * (i + 1));
-        [next[i], next[j]] = [next[j], next[i]];
-      }
-      return next;
-    }
+  function doctrineAdvantage(attackerKey, defenderKey) {
+    if (attackerKey === defenderKey) return 1;
+    if (DOCTRINE_COUNTER[attackerKey] === defenderKey) return 1.13;
+    if (DOCTRINE_COUNTER[defenderKey] === attackerKey) return 0.89;
+    return 1;
+  }
 
-    function sum(values) {
-      return values.reduce((total, value) => total + value, 0);
-    }
+  async function loadMap() {
+    const topo = await d3.json('data/states-10m.json');
+    const stateObject = topo.objects.states;
+    const allFeatures = topojson.feature(topo, stateObject).features;
+    const geometries = stateObject.geometries;
+    const geometryNeighbors = topojson.neighbors(geometries);
 
-    function shortNumber(value) {
-      if (value >= 1000000) return `${(value / 1000000).toFixed(1)}m`;
-      if (value >= 1000) return `${(value / 1000).toFixed(1)}k`;
-      return String(Math.round(value));
-    }
+    const contiguousFeatures = allFeatures.filter((feature) => {
+      const id = String(feature.id).padStart(2, '0');
+      return CONTIGUOUS_FIPS.has(id);
+    });
 
-    function toTitleCase(text) {
-      return text
-        .split(' ')
-        .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
-        .join(' ');
-    }
+    const featureCollection = { type: 'FeatureCollection', features: contiguousFeatures };
+    mapModel.projection = d3.geoAlbersUsa().fitExtent([[70, 60], [1130, 700]], featureCollection);
+    mapModel.pathGenerator = d3.geoPath(mapModel.projection);
 
-    function colorWithAlpha(hex, alpha) {
-      const clean = hex.replace('#', '');
-      const normalized = clean.length === 3 ? clean.split('').map((char) => `${char}${char}`).join('') : clean;
-      const r = Number.parseInt(normalized.slice(0, 2), 16);
-      const g = Number.parseInt(normalized.slice(2, 4), 16);
-      const b = Number.parseInt(normalized.slice(4, 6), 16);
-      return `rgba(${r}, ${g}, ${b}, ${alpha})`;
-    }
+    const fipsByIndex = geometries.map((geometry) => String(geometry.id).padStart(2, '0'));
+    const neighborById = {};
+    fipsByIndex.forEach((fips, index) => {
+      if (!CONTIGUOUS_FIPS.has(fips)) return;
+      const neighbors = geometryNeighbors[index]
+        .map((neighborIndex) => fipsByIndex[neighborIndex])
+        .filter((neighborFips) => CONTIGUOUS_FIPS.has(neighborFips));
+      neighborById[fips] = neighbors;
+    });
 
-    function makeId(prefix) {
-      return `${prefix}-${Math.random().toString(36).slice(2, 8)}`;
-    }
-
-    return {
-      clamp,
-      randInt,
-      randomChoice,
-      shuffle,
-      sum,
-      shortNumber,
-      toTitleCase,
-      colorWithAlpha,
-      makeId,
-    };
-  })();
-
-  const LORE = (() => {
-    function traitForRegion(region) {
-      const regionTraits = DATA.TRAITS.filter((trait) => trait.regions.includes(region));
-      return UTIL.randomChoice(regionTraits.length ? regionTraits : DATA.TRAITS);
-    }
-
-    function factionName(region, usedNames) {
-      const kit = DATA.REGION_NAMING[region] || DATA.REGION_NAMING.East;
-      for (let attempt = 0; attempt < 20; attempt += 1) {
-        const adjective = UTIL.randomChoice(kit.adjectives);
-        const noun = UTIL.randomChoice(kit.nouns);
-        const candidate = `The ${adjective} ${noun}`;
-        if (!usedNames.has(candidate)) {
-          usedNames.add(candidate);
-          return candidate;
-        }
-      }
-      const fallback = `The ${region} Ward ${usedNames.size + 1}`;
-      usedNames.add(fallback);
-      return fallback;
-    }
-
-    function playerFactionName(stateName) {
-      const stems = ['March', 'Banner', 'Crown', 'Stewardship', 'Compact'];
-      const suffix = UTIL.randomChoice(stems);
-      return `${stateName} ${suffix}`;
-    }
-
-    return {
-      traitForRegion,
-      factionName,
-      playerFactionName,
-    };
-  })();
-
-  const WORLD = (() => {
-    function makeStateTemplate(stateDefinition, ownerFactionId) {
-      const terrain = DATA.TERRAIN[stateDefinition.terrain];
-      const prosperityBase = stateDefinition.region === 'East' ? 76 : stateDefinition.region === 'Midwest' ? 74 : stateDefinition.region === 'South' ? 71 : stateDefinition.region === 'Plains' ? 68 : 66;
-      const prosperity = UTIL.clamp(prosperityBase + UTIL.randInt(-8, 9), 48, 92);
-      const levies = UTIL.clamp(Math.round(prosperity * 1.6 + UTIL.randInt(8, 26)), 48, 230);
-      const supply = UTIL.clamp(Math.round(56 * terrain.supply + UTIL.randInt(-6, 8)), 32, 95);
-
+    mapModel.states = contiguousFeatures.map((feature) => {
+      const id = String(feature.id).padStart(2, '0');
+      const abbr = STATE_ABBR_BY_FIPS[id];
+      const centroid = mapModel.pathGenerator.centroid(feature);
       return {
-        id: stateDefinition.id,
-        name: stateDefinition.name,
-        x: stateDefinition.x,
-        y: stateDefinition.y,
-        region: stateDefinition.region,
-        terrain: stateDefinition.terrain,
-        neighbors: [...stateDefinition.neighbors],
-        prosperity,
-        levies,
-        supply,
-        ownerFactionId,
-        control: { [ownerFactionId]: 100 },
-        frontline: false,
-        fortification: UTIL.clamp(Math.round(1 + (DATA.TERRAIN[stateDefinition.terrain].defense - 1) * 8 + Math.random() * 2), 0, 5),
+        id,
+        abbr,
+        name: feature.properties.name,
+        region: REGION_BY_ABBR[abbr] || 'East',
+        terrain: TERRAIN_BY_REGION[REGION_BY_ABBR[abbr] || 'East'],
+        neighbors: neighborById[id] || [],
+        path: mapModel.pathGenerator(feature),
+        centroid,
       };
-    }
+    });
 
-    function graphDistance(fromId, toId) {
-      if (fromId === toId) return 0;
-      const queue = [{ id: fromId, depth: 0 }];
-      const seen = new Set([fromId]);
-      while (queue.length) {
-        const current = queue.shift();
-        const state = DATA.LOOKUP[current.id];
-        for (const neighbor of state.neighbors) {
-          if (seen.has(neighbor)) continue;
-          if (neighbor === toId) return current.depth + 1;
-          seen.add(neighbor);
-          queue.push({ id: neighbor, depth: current.depth + 1 });
+    mapModel.statesById = Object.fromEntries(mapModel.states.map((state) => [state.id, state]));
+  }
+
+  function renderMapScaffold() {
+    const fillFragment = document.createDocumentFragment();
+    const borderFragment = document.createDocumentFragment();
+    const labelFragment = document.createDocumentFragment();
+
+    mapModel.states.forEach((state) => {
+      const fillPath = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+      fillPath.setAttribute('d', state.path);
+      fillPath.setAttribute('data-state-id', state.id);
+      fillPath.classList.add('state-shape');
+      fillPath.addEventListener('click', (event) => {
+        event.stopPropagation();
+        campaign.selectedStateId = state.id;
+        if (campaign.statesById[state.id]) {
+          campaign.statesById[state.id].pressure = campaign.statesById[state.id].pressure || 50;
         }
+        renderAll();
+      });
+      fillFragment.append(fillPath);
+
+      const borderPath = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+      borderPath.setAttribute('d', state.path);
+      borderPath.setAttribute('fill', 'none');
+      borderPath.setAttribute('stroke', 'rgba(54,42,28,0.6)');
+      borderPath.setAttribute('stroke-width', '0.9');
+      borderPath.style.pointerEvents = 'none';
+      borderFragment.append(borderPath);
+
+      const label = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+      label.setAttribute('x', String(state.centroid[0]));
+      label.setAttribute('y', String(state.centroid[1]));
+      label.setAttribute('dy', '0.35em');
+      label.classList.add('state-label');
+      label.textContent = state.abbr;
+      labelFragment.append(label);
+    });
+
+    FILL_LAYER.append(fillFragment);
+    BORDER_LAYER.append(borderFragment);
+    LABEL_LAYER.append(labelFragment);
+  }
+
+  function stateDistance(fromId, toId) {
+    if (fromId === toId) return 0;
+    const queue = [{ id: fromId, depth: 0 }];
+    const seen = new Set([fromId]);
+    while (queue.length) {
+      const node = queue.shift();
+      const neighbors = mapModel.statesById[node.id].neighbors;
+      for (const neighborId of neighbors) {
+        if (seen.has(neighborId)) continue;
+        if (neighborId === toId) return node.depth + 1;
+        seen.add(neighborId);
+        queue.push({ id: neighborId, depth: node.depth + 1 });
       }
-      return Number.POSITIVE_INFINITY;
+    }
+    return Number.POSITIVE_INFINITY;
+  }
+
+  function chooseFactionSeeds(candidateIds, count) {
+    const shuffledIds = shuffle(candidateIds);
+    const seeds = [];
+    for (const candidateId of shuffledIds) {
+      if (seeds.length >= count) break;
+      if (!seeds.length) {
+        seeds.push(candidateId);
+        continue;
+      }
+      const minDistance = Math.min(...seeds.map((seedId) => stateDistance(seedId, candidateId)));
+      if (minDistance >= 3) seeds.push(candidateId);
     }
 
-    function majorityRegion(stateIds) {
-      const tally = {};
-      for (const stateId of stateIds) {
-        const region = DATA.LOOKUP[stateId].region;
-        tally[region] = (tally[region] || 0) + 1;
-      }
-      return Object.entries(tally).sort((a, b) => b[1] - a[1])[0][0];
+    let index = 0;
+    while (seeds.length < count && index < shuffledIds.length) {
+      if (!seeds.includes(shuffledIds[index])) seeds.push(shuffledIds[index]);
+      index += 1;
     }
+    return seeds;
+  }
 
-    function growClusters(seedIds, availableIds) {
-      const clusters = seedIds.map((seed) => new Set([seed]));
-      const unclaimed = new Set(availableIds.filter((id) => !seedIds.includes(id)));
+  function expandFactionClusters(seedIds, allIds) {
+    const clusters = seedIds.map((seed) => new Set([seed]));
+    const unassigned = new Set(allIds.filter((stateId) => !seedIds.includes(stateId)));
 
-      let guard = 0;
-      while (unclaimed.size && guard < 350) {
-        guard += 1;
-        let progressThisRound = false;
+    let loops = 0;
+    while (unassigned.size && loops < 500) {
+      loops += 1;
+      let progressed = false;
 
-        for (let clusterIndex = 0; clusterIndex < clusters.length; clusterIndex += 1) {
-          const cluster = clusters[clusterIndex];
-          const frontier = [];
-          for (const stateId of cluster) {
-            const neighbors = DATA.LOOKUP[stateId].neighbors;
-            for (const neighborId of neighbors) {
-              if (unclaimed.has(neighborId)) frontier.push(neighborId);
-            }
-          }
-
-          if (!frontier.length) continue;
-          const picked = UTIL.randomChoice(frontier);
-          cluster.add(picked);
-          unclaimed.delete(picked);
-          progressThisRound = true;
-        }
-
-        if (!progressThisRound) {
-          for (const stateId of [...unclaimed]) {
-            let bestCluster = 0;
-            let bestDistance = Number.POSITIVE_INFINITY;
-            for (let clusterIndex = 0; clusterIndex < clusters.length; clusterIndex += 1) {
-              const distanceCandidates = [...clusters[clusterIndex]].map((node) => graphDistance(node, stateId));
-              const distance = Math.min(...distanceCandidates);
-              if (distance < bestDistance) {
-                bestDistance = distance;
-                bestCluster = clusterIndex;
-              }
-            }
-            clusters[bestCluster].add(stateId);
-            unclaimed.delete(stateId);
-          }
-        }
-      }
-
-      return clusters.map((cluster) => [...cluster]);
-    }
-
-    function chooseFactionSeeds(stateIds, desiredCount) {
-      const shuffled = UTIL.shuffle(stateIds);
-      const seeds = [];
-      for (const candidate of shuffled) {
-        if (seeds.length >= desiredCount) break;
-        if (!seeds.length) {
-          seeds.push(candidate);
-          continue;
-        }
-        const minDistance = Math.min(...seeds.map((seed) => graphDistance(seed, candidate)));
-        if (minDistance >= 3) seeds.push(candidate);
-      }
-
-      let cursor = 0;
-      while (seeds.length < desiredCount && cursor < shuffled.length) {
-        const candidate = shuffled[cursor];
-        if (!seeds.includes(candidate)) seeds.push(candidate);
-        cursor += 1;
-      }
-
-      return seeds;
-    }
-
-    function generateFactions(startStateId) {
-      const usedNames = new Set();
-      const playerState = DATA.LOOKUP[startStateId];
-      const playerFactionId = 'player';
-      const playerRegion = playerState.region;
-      const playerTrait = LORE.traitForRegion(playerRegion);
-
-      const factions = {
-        [playerFactionId]: {
-          id: playerFactionId,
-          name: LORE.playerFactionName(playerState.name),
-          traitId: playerTrait.id,
-          traitName: playerTrait.name,
-          traitSummary: playerTrait.summary,
-          traitEffect: playerTrait.effect,
-          color: '#6e3b2b',
-          capitalStateId: startStateId,
-          isPlayer: true,
-          aggression: 0.0,
-          preferredDoctrine: 'fabian',
-          resources: { gold: 280, levies: 220, rations: 210, siegeworks: 120 },
-          statesOwned: 1,
-          power: 0,
-        },
-      };
-
-      const nonPlayerStates = DATA.STATES.filter((state) => state.id !== startStateId).map((state) => state.id);
-      const aiFactionCount = UTIL.clamp(Math.round(nonPlayerStates.length / 6.8), 6, 9);
-      const seeds = chooseFactionSeeds(nonPlayerStates, aiFactionCount);
-      const clusters = growClusters(seeds, nonPlayerStates);
-
-      const assignments = { [startStateId]: playerFactionId };
-
-      clusters.forEach((cluster, index) => {
-        const factionId = `ai-${index + 1}`;
-        const region = majorityRegion(cluster);
-        const trait = LORE.traitForRegion(region);
-        const capitalStateId = cluster[Math.floor(Math.random() * cluster.length)];
-
-        factions[factionId] = {
-          id: factionId,
-          name: LORE.factionName(region, usedNames),
-          traitId: trait.id,
-          traitName: trait.name,
-          traitSummary: trait.summary,
-          traitEffect: trait.effect,
-          color: DATA.PALETTE[index % DATA.PALETTE.length],
-          capitalStateId,
-          isPlayer: false,
-          aggression: 0.38 + Math.random() * 0.42,
-          preferredDoctrine: UTIL.randomChoice(['fabian', 'feigned', 'siege']),
-          resources: {
-            gold: 240 + cluster.length * UTIL.randInt(36, 52),
-            levies: 180 + cluster.length * UTIL.randInt(22, 34),
-            rations: 170 + cluster.length * UTIL.randInt(20, 28),
-            siegeworks: 90 + cluster.length * UTIL.randInt(12, 22),
-          },
-          statesOwned: cluster.length,
-          power: 0,
-        };
-
+      clusters.forEach((cluster) => {
+        const frontier = [];
         cluster.forEach((stateId) => {
-          assignments[stateId] = factionId;
-        });
-      });
-
-      return {
-        factions,
-        assignments,
-        playerFactionId,
-      };
-    }
-
-    function createCampaign(startStateId) {
-      const { factions, assignments, playerFactionId } = generateFactions(startStateId);
-      const states = {};
-      DATA.STATES.forEach((stateDefinition) => {
-        states[stateDefinition.id] = makeStateTemplate(stateDefinition, assignments[stateDefinition.id]);
-      });
-
-      const campaign = {
-        version: DATA.SAVE_VERSION,
-        season: 1,
-        playerFactionId,
-        selectedStateId: startStateId,
-        queue: [],
-        autoAdvance: false,
-        allocations: {
-          levy: 45,
-          siege: 25,
-          civil: 30,
-        },
-        doctrineByFaction: Object.fromEntries(Object.values(factions).map((faction) => [faction.id, faction.preferredDoctrine])),
-        states,
-        factions,
-        chronicle: [`Season 1: ${factions[playerFactionId].name} rises from ${DATA.LOOKUP[startStateId].name}.`],
-        status: 'Live',
-        lastSavedAt: null,
-      };
-
-      refreshOwnershipAndFrontline(campaign);
-      recalculateFactionPower(campaign);
-
-      return campaign;
-    }
-
-    function getDominantControl(state) {
-      const entries = Object.entries(state.control).filter(([, share]) => share > 0.05);
-      entries.sort((a, b) => b[1] - a[1]);
-      const [factionId, share] = entries[0];
-      return { factionId, share };
-    }
-
-    function normalizeControl(state) {
-      const cleaned = {};
-      let total = 0;
-      for (const [factionId, share] of Object.entries(state.control)) {
-        if (share <= 0.01) continue;
-        cleaned[factionId] = share;
-        total += share;
-      }
-      if (total <= 0) {
-        cleaned[state.ownerFactionId] = 100;
-        total = 100;
-      }
-      const normalized = {};
-      for (const [factionId, share] of Object.entries(cleaned)) {
-        normalized[factionId] = (share / total) * 100;
-      }
-      state.control = normalized;
-    }
-
-    function transferControl(state, attackerId, delta) {
-      if (delta === 0) return;
-      if (!state.control[attackerId]) state.control[attackerId] = 0;
-
-      if (delta > 0) {
-        let remaining = delta;
-        const victims = Object.entries(state.control)
-          .filter(([factionId]) => factionId !== attackerId)
-          .sort((a, b) => b[1] - a[1]);
-
-        for (const [victimId] of victims) {
-          if (remaining <= 0) break;
-          const available = state.control[victimId] || 0;
-          const taken = Math.min(available, remaining);
-          state.control[victimId] = available - taken;
-          state.control[attackerId] += taken;
-          remaining -= taken;
-        }
-      } else {
-        const retreat = Math.abs(delta);
-        const dominant = getDominantControl(state);
-        const beneficiaryId = dominant.factionId === attackerId
-          ? Object.entries(state.control)
-              .filter(([factionId]) => factionId !== attackerId)
-              .sort((a, b) => b[1] - a[1])[0]?.[0]
-          : dominant.factionId;
-
-        if (!beneficiaryId) return;
-        const removed = Math.min(state.control[attackerId] || 0, retreat);
-        state.control[attackerId] -= removed;
-        state.control[beneficiaryId] = (state.control[beneficiaryId] || 0) + removed;
-      }
-
-      normalizeControl(state);
-      const dominant = getDominantControl(state);
-      state.ownerFactionId = dominant.factionId;
-    }
-
-    function ownedStateIds(campaign, factionId) {
-      return Object.values(campaign.states)
-        .filter((state) => state.ownerFactionId === factionId)
-        .map((state) => state.id);
-    }
-
-    function refreshOwnershipAndFrontline(campaign) {
-      const counts = {};
-      Object.values(campaign.factions).forEach((faction) => {
-        faction.statesOwned = 0;
-      });
-
-      Object.values(campaign.states).forEach((state) => {
-        normalizeControl(state);
-        const dominant = getDominantControl(state);
-        state.ownerFactionId = dominant.factionId;
-        counts[state.ownerFactionId] = (counts[state.ownerFactionId] || 0) + 1;
-        state.frontline = state.neighbors.some((neighborId) => campaign.states[neighborId].ownerFactionId !== state.ownerFactionId);
-      });
-
-      Object.entries(counts).forEach(([factionId, amount]) => {
-        if (campaign.factions[factionId]) {
-          campaign.factions[factionId].statesOwned = amount;
-        }
-      });
-
-      Object.values(campaign.factions).forEach((faction) => {
-        if (faction.statesOwned === 0) {
-          faction.resources.gold = 0;
-          faction.resources.levies = 0;
-          faction.resources.rations = 0;
-          faction.resources.siegeworks = 0;
-        } else if (!campaign.states[faction.capitalStateId] || campaign.states[faction.capitalStateId].ownerFactionId !== faction.id) {
-          const replacement = ownedStateIds(campaign, faction.id)
-            .sort((a, b) => campaign.states[b].prosperity - campaign.states[a].prosperity)[0];
-          faction.capitalStateId = replacement;
-        }
-      });
-    }
-
-    function connectedToCapital(campaign, factionId, stateId) {
-      const faction = campaign.factions[factionId];
-      if (!faction || faction.statesOwned === 0) return false;
-      const capital = faction.capitalStateId;
-      if (!capital) return false;
-      if (capital === stateId) return true;
-
-      const queue = [capital];
-      const seen = new Set([capital]);
-
-      while (queue.length) {
-        const currentId = queue.shift();
-        const current = campaign.states[currentId];
-        for (const neighborId of current.neighbors) {
-          if (seen.has(neighborId)) continue;
-          const neighbor = campaign.states[neighborId];
-          if (neighbor.ownerFactionId !== factionId) continue;
-          if (neighborId === stateId) return true;
-          seen.add(neighborId);
-          queue.push(neighborId);
-        }
-      }
-
-      return false;
-    }
-
-    function recalculateFactionPower(campaign) {
-      Object.values(campaign.factions).forEach((faction) => {
-        const owned = Object.values(campaign.states).filter((state) => state.ownerFactionId === faction.id);
-        const levyPower = UTIL.sum(owned.map((state) => state.levies));
-        const supplyPower = UTIL.sum(owned.map((state) => state.supply));
-        faction.power = Math.round(
-          levyPower * 0.55
-          + supplyPower * 0.35
-          + faction.resources.gold * 0.16
-          + faction.resources.siegeworks * 0.28
-          + owned.length * 32
-        );
-      });
-    }
-
-    function visibilitySet(campaign) {
-      const visible = new Set();
-      const playerId = campaign.playerFactionId;
-      Object.values(campaign.states).forEach((state) => {
-        if (state.ownerFactionId === playerId) {
-          visible.add(state.id);
-          state.neighbors.forEach((neighborId) => visible.add(neighborId));
-        }
-      });
-      return visible;
-    }
-
-    return {
-      createCampaign,
-      ownedStateIds,
-      refreshOwnershipAndFrontline,
-      connectedToCapital,
-      recalculateFactionPower,
-      visibilitySet,
-      getDominantControl,
-      transferControl,
-    };
-  })();
-
-  const ENGINE = (() => {
-    function doctrineAdvantage(attackerDoctrineKey, defenderDoctrineKey) {
-      if (attackerDoctrineKey === defenderDoctrineKey) return 1;
-      if (DATA.DOCTRINE_COUNTERS[attackerDoctrineKey] === defenderDoctrineKey) return 1.12;
-      if (DATA.DOCTRINE_COUNTERS[defenderDoctrineKey] === attackerDoctrineKey) return 0.9;
-      return 1;
-    }
-
-    function factionMultiplier(campaign, factionId, metric) {
-      const faction = campaign.factions[factionId];
-      if (!faction) return 1;
-      return faction.traitEffect[metric] || 1;
-    }
-
-    function supplyFactor(campaign, factionId, sourceStateId) {
-      const connected = WORLD.connectedToCapital(campaign, factionId, sourceStateId);
-      const sourceState = campaign.states[sourceStateId];
-      const faction = campaign.factions[factionId];
-      const rationPressure = UTIL.clamp((faction.resources.rations + sourceState.supply * 2) / Math.max(1, faction.statesOwned * 180), 0.55, 1.26);
-      if (!connected) return 0.7 * rationPressure;
-      return 1.0 * rationPressure;
-    }
-
-    function estimateCampaignScore(campaign, attackerId, sourceState, targetState, doctrineKey) {
-      const attackerDoctrine = DATA.DOCTRINES[doctrineKey];
-      const defenderDoctrineKey = campaign.doctrineByFaction[targetState.ownerFactionId] || campaign.factions[targetState.ownerFactionId].preferredDoctrine;
-      const defenderDoctrine = DATA.DOCTRINES[defenderDoctrineKey];
-
-      const supply = supplyFactor(campaign, attackerId, sourceState.id) * attackerDoctrine.supply;
-      const terrainDefense = DATA.TERRAIN[targetState.terrain].defense;
-      const doctrineRps = doctrineAdvantage(doctrineKey, defenderDoctrineKey);
-      const attackerTrait = factionMultiplier(campaign, attackerId, 'levy');
-      const defenderTrait = factionMultiplier(campaign, targetState.ownerFactionId, 'defense');
-
-      const attackStrength = sourceState.levies * attackerDoctrine.attack * attackerTrait * supply * doctrineRps;
-      const defenseStrength = targetState.levies * defenderDoctrine.defense * terrainDefense * defenderTrait * (1 + targetState.fortification * 0.06);
-
-      return {
-        ratio: attackStrength / Math.max(defenseStrength, 1),
-        supply,
-        defenderDoctrineKey,
-      };
-    }
-
-    function campaignResultMessage(campaign, details, visibility) {
-      const attacker = campaign.factions[details.attackerId];
-      const defender = campaign.factions[details.defenderId];
-      const source = campaign.states[details.sourceId];
-      const target = campaign.states[details.targetId];
-      const visible = visibility.has(details.sourceId) || visibility.has(details.targetId);
-
-      if (!visible && !details.isPlayerAction) {
-        return `Rumors spread of heavy fighting near ${target.region}; scouts confirm banners shifting.`;
-      }
-
-      if (details.capture) {
-        return `${attacker.name} wrests ${target.name} from ${defender.name} (${source.id} spearhead, ${details.controlShift}% control swing).`;
-      }
-
-      if (details.controlShift > 0) {
-        return `${attacker.name} presses into ${target.name}: +${details.controlShift}% control. ${Math.round(details.attackerLoss)} levies spent.`;
-      }
-
-      return `${attacker.name} is repelled at ${target.name}; ${Math.round(details.attackerLoss)} levies lost under counterfire.`;
-    }
-
-    function executeCampaign(campaign, action, visibility) {
-      const source = campaign.states[action.sourceId];
-      const target = campaign.states[action.targetId];
-      if (!source || !target) return null;
-      if (source.ownerFactionId !== action.attackerId) return null;
-      if (target.ownerFactionId === action.attackerId) return null;
-      if (!source.neighbors.includes(target.id)) return null;
-
-      const attackerId = action.attackerId;
-      const defenderId = target.ownerFactionId;
-      const doctrineKey = action.doctrineKey;
-      const doctrine = DATA.DOCTRINES[doctrineKey];
-
-      const score = estimateCampaignScore(campaign, attackerId, source, target, doctrineKey);
-      const swingRandom = 0.9 + Math.random() * 0.22;
-      const rawShift = (score.ratio - 0.88) * 15 * doctrine.siege * factionMultiplier(campaign, attackerId, 'siege') * swingRandom;
-      const sourceSupplyPenalty = score.supply < 0.85 ? 2.7 : 0;
-      let controlShift = Math.round(UTIL.clamp(rawShift - sourceSupplyPenalty, -10, 19));
-
-      const defenderControlShare = target.control[defenderId] || 0;
-      if (defenderControlShare < 18 && controlShift < 0) controlShift = Math.min(0, controlShift + 2);
-
-      const attackCommit = Math.max(30, source.levies * 0.38);
-      const defenseCommit = Math.max(30, target.levies * 0.44);
-
-      const attackerLossBase = attackCommit * (0.11 + 0.22 * (1 / Math.max(score.ratio, 0.35)));
-      const defenderLossBase = defenseCommit * (0.12 + 0.22 * Math.max(score.ratio, 0.48));
-      const supplyAttrition = score.supply < 0.8 ? attackCommit * (0.08 + (0.8 - score.supply) * 0.25) : 0;
-
-      const attackerLoss = Math.max(8, attackerLossBase + supplyAttrition);
-      const defenderLoss = Math.max(6, defenderLossBase * (controlShift > 0 ? 1.06 : 0.78));
-
-      source.levies = UTIL.clamp(source.levies - Math.round(attackerLoss), 10, 360);
-      target.levies = UTIL.clamp(target.levies - Math.round(defenderLoss), 8, 360);
-
-      source.supply = UTIL.clamp(source.supply - Math.round(5 + (1 - score.supply) * 12), 20, 120);
-      target.supply = UTIL.clamp(target.supply - Math.round(Math.max(2, controlShift > 0 ? 6 : 3)), 18, 120);
-
-      const ownerBefore = target.ownerFactionId;
-      WORLD.transferControl(target, attackerId, controlShift);
-      const ownerAfter = target.ownerFactionId;
-
-      const attackerFaction = campaign.factions[attackerId];
-      const defenderFaction = campaign.factions[defenderId];
-      attackerFaction.resources.rations = UTIL.clamp(attackerFaction.resources.rations - Math.round(attackerLoss * 0.45), 0, 99999);
-      defenderFaction.resources.rations = UTIL.clamp(defenderFaction.resources.rations - Math.round(defenderLoss * 0.3), 0, 99999);
-      attackerFaction.resources.levies = UTIL.clamp(attackerFaction.resources.levies - Math.round(attackerLoss * 0.55), 0, 99999);
-      defenderFaction.resources.levies = UTIL.clamp(defenderFaction.resources.levies - Math.round(defenderLoss * 0.35), 0, 99999);
-
-      const details = {
-        attackerId,
-        defenderId,
-        sourceId: source.id,
-        targetId: target.id,
-        attackerLoss,
-        controlShift,
-        capture: ownerBefore !== ownerAfter,
-        isPlayerAction: action.isPlayerAction,
-      };
-
-      return { message: campaignResultMessage(campaign, details, visibility) };
-    }
-
-    function produceSeasonEconomy(campaign) {
-      Object.values(campaign.factions).forEach((faction) => {
-        if (faction.statesOwned <= 0) return;
-
-        const ownedStates = Object.values(campaign.states).filter((state) => state.ownerFactionId === faction.id);
-        const civicIndex = UTIL.sum(ownedStates.map((state) => state.prosperity * DATA.TERRAIN[state.terrain].yield));
-
-        let levyShare;
-        let siegeShare;
-        let civilShare;
-
-        if (faction.isPlayer) {
-          levyShare = campaign.allocations.levy / 100;
-          siegeShare = campaign.allocations.siege / 100;
-          civilShare = campaign.allocations.civil / 100;
-        } else {
-          levyShare = UTIL.clamp(0.35 + faction.aggression * 0.38, 0.3, 0.72);
-          siegeShare = UTIL.clamp(0.18 + faction.aggression * 0.2, 0.14, 0.44);
-          civilShare = UTIL.clamp(1 - levyShare - siegeShare, 0.08, 0.36);
-        }
-
-        const trait = faction.traitEffect;
-
-        const levyGain = civicIndex * levyShare * 0.22 * trait.levy;
-        const siegeGain = civicIndex * siegeShare * 0.16 * trait.siege;
-        const goldGain = civicIndex * (0.2 + civilShare * 0.34) * trait.civil;
-        const rationGain = civicIndex * (0.18 + civilShare * 0.26) * trait.ration;
-
-        faction.resources.levies = UTIL.clamp(faction.resources.levies + levyGain, 0, 250000);
-        faction.resources.siegeworks = UTIL.clamp(faction.resources.siegeworks + siegeGain, 0, 250000);
-        faction.resources.gold = UTIL.clamp(faction.resources.gold + goldGain, 0, 250000);
-        faction.resources.rations = UTIL.clamp(faction.resources.rations + rationGain, 0, 250000);
-
-        const perStateLevies = Math.max(1, levyGain / ownedStates.length);
-        const perStateRations = Math.max(1, rationGain / ownedStates.length);
-
-        ownedStates.forEach((state) => {
-          state.levies = UTIL.clamp(state.levies + Math.round(perStateLevies * (0.75 + Math.random() * 0.55)), 8, 420);
-          state.supply = UTIL.clamp(state.supply + Math.round((perStateRations / 16) * trait.supply), 16, 132);
-        });
-      });
-    }
-
-    function applySupplyAttrition(campaign, visibility) {
-      const isolatedNotes = [];
-      Object.values(campaign.factions).forEach((faction) => {
-        if (faction.statesOwned <= 0) return;
-
-        const ownedStates = Object.values(campaign.states).filter((state) => state.ownerFactionId === faction.id);
-        let isolatedCount = 0;
-
-        for (const state of ownedStates) {
-          const connected = WORLD.connectedToCapital(campaign, faction.id, state.id);
-          if (!connected) {
-            isolatedCount += 1;
-            const loss = Math.max(4, Math.round(state.levies * 0.08));
-            state.levies = UTIL.clamp(state.levies - loss, 6, 420);
-            state.supply = UTIL.clamp(state.supply - UTIL.randInt(7, 14), 12, 132);
-            faction.resources.rations = UTIL.clamp(faction.resources.rations - loss * 0.5, 0, 99999);
-          }
-        }
-
-        if (isolatedCount > 0) {
-          if (faction.isPlayer) {
-            isolatedNotes.push(`${faction.name} has ${isolatedCount} isolated holdings bleeding levies.`);
-          } else {
-            const visibleFaction = ownedStates.some((state) => visibility.has(state.id));
-            if (visibleFaction) {
-              isolatedNotes.push(`${faction.name} supply lines fray across ${isolatedCount} holdings.`);
-            }
-          }
-        }
-      });
-      return isolatedNotes;
-    }
-
-    function chooseAiDoctrine(campaign, factionId, sourceState, targetState) {
-      const faction = campaign.factions[factionId];
-      const aggression = faction.aggression;
-      const connected = WORLD.connectedToCapital(campaign, factionId, sourceState.id);
-      const terrain = targetState.terrain;
-
-      if (!connected || faction.resources.rations < faction.statesOwned * 80) return 'fabian';
-      if (terrain === 'mountain' || terrain === 'hills') return aggression > 0.58 ? 'siege' : 'fabian';
-      if (aggression > 0.66 && faction.resources.siegeworks > faction.statesOwned * 28) return 'siege';
-      if (aggression > 0.5) return 'feigned';
-      return faction.preferredDoctrine;
-    }
-
-    function planAiActions(campaign) {
-      const plans = [];
-      Object.values(campaign.factions).forEach((faction) => {
-        if (faction.isPlayer || faction.statesOwned <= 0) return;
-
-        const ownedFrontline = Object.values(campaign.states)
-          .filter((state) => state.ownerFactionId === faction.id && state.frontline);
-
-        if (!ownedFrontline.length) return;
-
-        const actionsCount = faction.aggression > 0.7 ? 2 : 1;
-        const scoredActions = [];
-
-        ownedFrontline.forEach((sourceState) => {
-          if (sourceState.levies < 35) return;
-          sourceState.neighbors.forEach((neighborId) => {
-            const targetState = campaign.states[neighborId];
-            if (targetState.ownerFactionId === faction.id) return;
-
-            const doctrineKey = chooseAiDoctrine(campaign, faction.id, sourceState, targetState);
-            const score = estimateCampaignScore(campaign, faction.id, sourceState, targetState, doctrineKey);
-            const targetControl = targetState.control[faction.id] || 0;
-            const valueScore = targetState.prosperity * 0.15 + targetState.fortification * -2 + (100 - (targetState.control[targetState.ownerFactionId] || 0)) * 0.11;
-            const finalScore = score.ratio * 18 + valueScore + targetControl * 0.2;
-
-            scoredActions.push({
-              attackerId: faction.id,
-              sourceId: sourceState.id,
-              targetId: targetState.id,
-              doctrineKey,
-              score: finalScore,
-              isPlayerAction: false,
-            });
+          mapModel.statesById[stateId].neighbors.forEach((neighborId) => {
+            if (unassigned.has(neighborId)) frontier.push(neighborId);
           });
         });
-
-        scoredActions.sort((a, b) => b.score - a.score);
-        const uniqueTargets = new Set();
-        for (const action of scoredActions) {
-          if (plans.length >= 30) break;
-          const key = `${action.sourceId}-${action.targetId}`;
-          if (uniqueTargets.has(key)) continue;
-          uniqueTargets.add(key);
-          plans.push(action);
-          if (uniqueTargets.size >= actionsCount) break;
-        }
+        if (!frontier.length) return;
+        const selected = randomItem(frontier);
+        cluster.add(selected);
+        unassigned.delete(selected);
+        progressed = true;
       });
 
-      return plans;
-    }
-
-    function queueCampaign(campaign, sourceId, targetId, doctrineKey) {
-      const source = campaign.states[sourceId];
-      const target = campaign.states[targetId];
-      if (!source || !target) return { ok: false, reason: 'Invalid route.' };
-      if (source.ownerFactionId !== campaign.playerFactionId) return { ok: false, reason: 'Source must be under your rule.' };
-      if (target.ownerFactionId === campaign.playerFactionId) return { ok: false, reason: 'Target is already allied.' };
-      if (!source.neighbors.includes(targetId)) return { ok: false, reason: 'Campaign requires direct border adjacency.' };
-      if (campaign.queue.length >= 5) return { ok: false, reason: 'Action queue full (max 5).' };
-
-      campaign.queue.push({
-        id: UTIL.makeId('camp'),
-        attackerId: campaign.playerFactionId,
-        sourceId,
-        targetId,
-        doctrineKey,
-        isPlayerAction: true,
-      });
-
-      return { ok: true, reason: `${source.id} -> ${target.id} queued under ${DATA.DOCTRINES[doctrineKey].label}.` };
-    }
-
-    function updateCampaignStatus(campaign, notes) {
-      const playerId = campaign.playerFactionId;
-      const playerStates = Object.values(campaign.states).filter((state) => state.ownerFactionId === playerId).length;
-      const liveFactions = Object.values(campaign.factions).filter((faction) => faction.statesOwned > 0).length;
-
-      if (playerStates <= 0) {
-        campaign.status = 'Defeat';
-        notes.push('Your banner has fallen; no states remain under direct rule.');
-        return;
-      }
-
-      if (playerStates === DATA.STATES.length) {
-        campaign.status = 'Victory';
-        notes.push('All 48 continental states now fly your standard.');
-        return;
-      }
-
-      campaign.status = playerStates >= 24 ? 'Dominant' : 'Live';
-      if (liveFactions <= 2 && campaign.status === 'Dominant') {
-        notes.push('Only a handful of rivals remain. Final consolidation is in reach.');
-      }
-    }
-
-    function runSeason(campaign) {
-      if (campaign.status === 'Defeat' || campaign.status === 'Victory') return;
-
-      const visibility = WORLD.visibilitySet(campaign);
-      const seasonNotes = [];
-
-      produceSeasonEconomy(campaign);
-
-      if (campaign.queue.length) {
-        const queued = [...campaign.queue];
-        campaign.queue.length = 0;
-        for (const action of queued) {
-          const result = executeCampaign(campaign, action, visibility);
-          if (result) seasonNotes.push(result.message);
-        }
-      }
-
-      const aiPlans = planAiActions(campaign);
-      for (const action of aiPlans) {
-        const result = executeCampaign(campaign, action, visibility);
-        if (result) seasonNotes.push(result.message);
-      }
-
-      const supplyNotes = applySupplyAttrition(campaign, visibility);
-      supplyNotes.forEach((line) => seasonNotes.push(line));
-
-      WORLD.refreshOwnershipAndFrontline(campaign);
-      WORLD.recalculateFactionPower(campaign);
-
-      campaign.season += 1;
-      updateCampaignStatus(campaign, seasonNotes);
-
-      seasonNotes.slice(0, 8).reverse().forEach((message) => {
-        campaign.chronicle.unshift(`Season ${campaign.season - 1}: ${message}`);
-      });
-      campaign.chronicle = campaign.chronicle.slice(0, 180);
-    }
-
-    return {
-      queueCampaign,
-      runSeason,
-    };
-  })();
-
-  const STORE = (() => {
-    function save(campaign) {
-      campaign.lastSavedAt = new Date().toISOString();
-      localStorage.setItem(DATA.STORAGE_KEY, JSON.stringify(campaign));
-    }
-
-    function load() {
-      const raw = localStorage.getItem(DATA.STORAGE_KEY);
-      if (!raw) return null;
-      try {
-        const parsed = JSON.parse(raw);
-        if (!parsed || parsed.version !== DATA.SAVE_VERSION) return null;
-        if (!parsed.states || !parsed.factions) return null;
-        return parsed;
-      } catch {
-        return null;
-      }
-    }
-
-    function wipe() {
-      localStorage.removeItem(DATA.STORAGE_KEY);
-    }
-
-    function exportFile(campaign) {
-      const payload = JSON.stringify(campaign, null, 2);
-      const blob = new Blob([payload], { type: 'application/json' });
-      const url = URL.createObjectURL(blob);
-      const anchor = document.createElement('a');
-      anchor.href = url;
-      anchor.download = `continental-feuds-save-season-${campaign.season}.json`;
-      document.body.append(anchor);
-      anchor.click();
-      anchor.remove();
-      URL.revokeObjectURL(url);
-    }
-
-    function importFile(file) {
-      return new Promise((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onload = () => {
-          try {
-            const parsed = JSON.parse(String(reader.result));
-            if (!parsed || parsed.version !== DATA.SAVE_VERSION || !parsed.states || !parsed.factions) {
-              reject(new Error('Invalid save format.'));
-              return;
+      if (!progressed) {
+        [...unassigned].forEach((stateId) => {
+          let nearestClusterIndex = 0;
+          let nearestDistance = Number.POSITIVE_INFINITY;
+          clusters.forEach((cluster, clusterIndex) => {
+            const distances = [...cluster].map((clusterStateId) => stateDistance(clusterStateId, stateId));
+            const candidateDistance = Math.min(...distances);
+            if (candidateDistance < nearestDistance) {
+              nearestDistance = candidateDistance;
+              nearestClusterIndex = clusterIndex;
             }
-            resolve(parsed);
-          } catch {
-            reject(new Error('Could not parse save JSON.'));
-          }
-        };
-        reader.onerror = () => reject(new Error('Unable to read selected file.'));
-        reader.readAsText(file);
-      });
-    }
-
-    return {
-      save,
-      load,
-      wipe,
-      exportFile,
-      importFile,
-    };
-  })();
-
-  const UI = (() => {
-    const el = {
-      loadingScreen: document.getElementById('loading-screen'),
-      loadingBar: document.getElementById('loading-bar'),
-      loadingLog: document.getElementById('loading-log'),
-      seasonCount: document.getElementById('season-count'),
-      playerFaction: document.getElementById('player-faction'),
-      playerHoldings: document.getElementById('player-holdings'),
-      campaignState: document.getElementById('campaign-state'),
-      startState: document.getElementById('start-state'),
-      newCampaign: document.getElementById('new-campaign'),
-      goldReadout: document.getElementById('gold-readout'),
-      levyReadout: document.getElementById('levy-readout'),
-      rationReadout: document.getElementById('ration-readout'),
-      allocLevy: document.getElementById('alloc-levy'),
-      allocSiege: document.getElementById('alloc-siege'),
-      allocCivil: document.getElementById('alloc-civil'),
-      allocSummary: document.getElementById('alloc-summary'),
-      playerDoctrine: document.getElementById('player-doctrine'),
-      doctrineNote: document.getElementById('doctrine-note'),
-      sourceState: document.getElementById('source-state'),
-      targetState: document.getElementById('target-state'),
-      queueCampaign: document.getElementById('queue-campaign'),
-      advanceSeason: document.getElementById('advance-season'),
-      toggleAuto: document.getElementById('toggle-auto'),
-      mapGrid: document.getElementById('map-grid'),
-      stateInspector: document.getElementById('state-inspector'),
-      factionTable: document.getElementById('faction-table'),
-      chronicleLog: document.getElementById('chronicle-log'),
-      openSettings: document.getElementById('open-settings'),
-      settingsModal: document.getElementById('settings-modal'),
-      closeSettings: document.getElementById('close-settings'),
-      exportSave: document.getElementById('export-save'),
-      wipeSave: document.getElementById('wipe-save'),
-      importSave: document.getElementById('import-save'),
-      importFile: document.getElementById('import-file'),
-    };
-
-    const queuePanel = document.createElement('div');
-    queuePanel.id = 'queued-actions';
-    queuePanel.className = 'text-xs border border-[#8f7353]/35 rounded-md bg-[#fff9ee] px-2 py-2 min-h-[60px]';
-    queuePanel.textContent = 'No campaigns queued.';
-    el.queueCampaign.parentElement.append(queuePanel);
-
-    function renderAllocations(campaign) {
-      el.allocLevy.value = String(campaign.allocations.levy);
-      el.allocSiege.value = String(campaign.allocations.siege);
-      el.allocCivil.value = String(campaign.allocations.civil);
-      el.allocSummary.textContent = `Levies ${campaign.allocations.levy}% · Siegeworks ${campaign.allocations.siege}% · Civil ${campaign.allocations.civil}%`;
-    }
-
-    function normalizeAllocationInputs(campaign) {
-      const levy = Number(el.allocLevy.value);
-      const siege = Number(el.allocSiege.value);
-      const civil = Number(el.allocCivil.value);
-      const total = levy + siege + civil;
-
-      let nextCivil = civil;
-      if (total !== 100) {
-        const delta = 100 - total;
-        nextCivil = UTIL.clamp(civil + delta, 10, 60);
-      }
-
-      campaign.allocations = {
-        levy,
-        siege,
-        civil: nextCivil,
-      };
-      renderAllocations(campaign);
-    }
-
-    function renderDoctrineNote(campaign) {
-      const key = campaign.doctrineByFaction[campaign.playerFactionId];
-      const doctrine = DATA.DOCTRINES[key];
-      el.doctrineNote.textContent = doctrine.detail;
-    }
-
-    function visibleSet(campaign) {
-      return WORLD.visibilitySet(campaign);
-    }
-
-    function isFactionObserved(campaign, factionId, visibility) {
-      if (factionId === campaign.playerFactionId) return true;
-      return Object.values(campaign.states).some((state) => state.ownerFactionId === factionId && visibility.has(state.id));
-    }
-
-    function renderMap(campaign) {
-      const visibility = visibleSet(campaign);
-      const fragment = document.createDocumentFragment();
-
-      DATA.STATES.forEach((layoutState) => {
-        const state = campaign.states[layoutState.id];
-        const owner = campaign.factions[state.ownerFactionId];
-        const dominant = WORLD.getDominantControl(state);
-        const visible = visibility.has(state.id) || state.ownerFactionId === campaign.playerFactionId;
-
-        const tile = document.createElement('button');
-        tile.type = 'button';
-        tile.className = 'state-tile';
-        tile.style.gridColumn = String(layoutState.x);
-        tile.style.gridRow = String(layoutState.y);
-
-        const density = UTIL.clamp(0.33 + dominant.share / 150, 0.3, 0.88);
-        tile.style.background = `linear-gradient(165deg, ${UTIL.colorWithAlpha(owner.color, density)}, ${UTIL.colorWithAlpha(owner.color, density - 0.12)})`;
-
-        if (state.ownerFactionId === campaign.playerFactionId) tile.classList.add('player');
-        if (state.frontline) tile.classList.add('frontline');
-
-        const troopText = visible ? String(Math.round(state.levies)) : '??';
-
-        tile.innerHTML = [
-          '<div class="w-full px-1">',
-          `<div class="flex justify-between items-center"><span>${state.id}</span><span class="text-[10px]">${troopText}</span></div>`,
-          '<div class="h-[6px] bg-black/15 rounded overflow-hidden mt-[2px]">',
-          `<div class="h-full" style="width:${UTIL.clamp(dominant.share, 2, 100)}%; background:${owner.color}"></div>`,
-          '</div>',
-          `<small>${Math.round(dominant.share)}% control</small>`,
-          '</div>',
-        ].join('');
-
-        tile.addEventListener('click', () => {
-          campaign.selectedStateId = state.id;
-          renderInspector(campaign);
+          });
+          clusters[nearestClusterIndex].add(stateId);
+          unassigned.delete(stateId);
         });
-
-        fragment.append(tile);
-      });
-
-      el.mapGrid.innerHTML = '';
-      el.mapGrid.append(fragment);
-    }
-
-    function renderInspector(campaign) {
-      const visibility = visibleSet(campaign);
-      const state = campaign.states[campaign.selectedStateId];
-      if (!state) {
-        el.stateInspector.textContent = 'Select a territory to inspect manor control, supply line, and defensive doctrine.';
-        return;
       }
-
-      const owner = campaign.factions[state.ownerFactionId];
-      const visible = visibility.has(state.id) || state.ownerFactionId === campaign.playerFactionId;
-      const playerShare = state.control[campaign.playerFactionId] || 0;
-      const connected = WORLD.connectedToCapital(campaign, state.ownerFactionId, state.id);
-
-      const controlRows = Object.entries(state.control)
-        .sort((a, b) => b[1] - a[1])
-        .slice(0, 3)
-        .map(([factionId, share]) => `${campaign.factions[factionId].name}: ${share.toFixed(1)}%`)
-        .join(' · ');
-
-      const doctrine = campaign.doctrineByFaction[state.ownerFactionId] || campaign.factions[state.ownerFactionId].preferredDoctrine;
-      const doctrineLabel = DATA.DOCTRINES[doctrine].label;
-
-      el.stateInspector.innerHTML = [
-        `<strong>${state.name} (${state.id})</strong><br>`,
-        `Liege: ${owner.name}<br>`,
-        visible
-          ? `Levies ${Math.round(state.levies)} · Supply ${Math.round(state.supply)} · Fort ${state.fortification}<br>`
-          : 'Levies obscured by fog of war beyond adjacent borders.<br>',
-        `Control Ledger: ${controlRows}<br>`,
-        `Terrain ${UTIL.toTitleCase(state.terrain)} · Doctrine ${visible ? doctrineLabel : 'Obscured'} · Supply Line ${connected ? 'Connected' : 'Cut'}<br>`,
-        `Your foothold in this state: ${playerShare.toFixed(1)}%`,
-      ].join('');
     }
 
-    function renderFactionTable(campaign) {
-      const visibility = visibleSet(campaign);
-      const rows = Object.values(campaign.factions)
-        .filter((faction) => faction.statesOwned > 0)
-        .sort((a, b) => b.statesOwned - a.statesOwned || b.power - a.power)
-        .slice(0, 10);
+    return clusters.map((cluster) => [...cluster]);
+  }
 
-      el.factionTable.innerHTML = rows
-        .map((faction) => {
-          const seen = isFactionObserved(campaign, faction.id, visibility);
-          const warPower = seen ? UTIL.shortNumber(faction.power) : `~${UTIL.shortNumber(faction.statesOwned * 140)}`;
-          return `<tr class="border-b border-[#8f7353]/20"><td class="py-1 pr-1">${faction.name}</td><td>${faction.statesOwned}</td><td>${warPower}</td></tr>`;
-        })
-        .join('');
-    }
+  function pickTrait(region) {
+    const options = TRAITS.filter((trait) => trait.regions.includes(region));
+    return randomItem(options.length ? options : TRAITS);
+  }
 
-    function renderChronicle(campaign) {
-      el.chronicleLog.innerHTML = campaign.chronicle
-        .slice(0, 36)
-        .map((entry) => `<div class="border-b border-[#8f7353]/20 pb-1">${entry.replace(/</g, '&lt;').replace(/>/g, '&gt;')}</div>`)
-        .join('');
-    }
-
-    function renderQueue(campaign) {
-      if (!campaign.queue.length) {
-        queuePanel.textContent = 'No campaigns queued.';
-        return;
+  function pickFactionName(region, used) {
+    const kit = FACTION_NAME_KITS[region] || FACTION_NAME_KITS.East;
+    for (let i = 0; i < 24; i += 1) {
+      const candidate = `The ${randomItem(kit.adjectives)} ${randomItem(kit.nouns)}`;
+      if (!used.has(candidate)) {
+        used.add(candidate);
+        return candidate;
       }
-      queuePanel.innerHTML = campaign.queue
-        .map((action, index) => {
-          const doctrineLabel = DATA.DOCTRINES[action.doctrineKey].label;
-          return `${index + 1}. ${action.sourceId} -> ${action.targetId} (${doctrineLabel})`;
-        })
-        .map((line) => `<div>${line}</div>`)
-        .join('');
     }
+    const fallback = `The ${region} Ward ${used.size + 1}`;
+    used.add(fallback);
+    return fallback;
+  }
 
-    function renderResourceHeader(campaign) {
-      const player = campaign.factions[campaign.playerFactionId];
-      el.goldReadout.textContent = UTIL.shortNumber(player.resources.gold);
-      el.levyReadout.textContent = UTIL.shortNumber(player.resources.levies);
-      el.rationReadout.textContent = UTIL.shortNumber(player.resources.rations);
+  function initializeCampaign(startStateId) {
+    const playerState = mapModel.statesById[startStateId];
+    const playerRegion = playerState.region;
+    const playerTrait = pickTrait(playerRegion);
 
-      el.seasonCount.textContent = String(campaign.season);
-      el.playerFaction.textContent = player.name;
-      el.playerHoldings.textContent = `${player.statesOwned} / 48`;
-      el.campaignState.textContent = campaign.status;
-    }
-
-    function playerOwnedSources(campaign) {
-      return Object.values(campaign.states)
-        .filter((state) => state.ownerFactionId === campaign.playerFactionId && state.frontline)
-        .sort((a, b) => b.levies - a.levies || a.name.localeCompare(b.name));
-    }
-
-    function renderSourceTargetOptions(campaign) {
-      const sources = playerOwnedSources(campaign);
-      el.sourceState.innerHTML = '';
-      if (!sources.length) {
-        el.sourceState.innerHTML = '<option value="">No frontline state available</option>';
-        el.targetState.innerHTML = '<option value="">No target</option>';
-        return;
-      }
-
-      sources.forEach((state) => {
-        const option = document.createElement('option');
-        option.value = state.id;
-        option.textContent = `${state.name} (${state.id})`;
-        el.sourceState.append(option);
-      });
-
-      if (!sources.some((state) => state.id === el.sourceState.value)) {
-        el.sourceState.value = sources[0].id;
-      }
-
-      renderTargetOptionsFromSource(campaign, el.sourceState.value);
-    }
-
-    function renderTargetOptionsFromSource(campaign, sourceId) {
-      const source = campaign.states[sourceId];
-      el.targetState.innerHTML = '';
-      if (!source) {
-        el.targetState.innerHTML = '<option value="">No target</option>';
-        return;
-      }
-
-      const targets = source.neighbors
-        .map((neighborId) => campaign.states[neighborId])
-        .filter((state) => state.ownerFactionId !== campaign.playerFactionId)
-        .sort((a, b) => (a.control[campaign.playerFactionId] || 0) - (b.control[campaign.playerFactionId] || 0));
-
-      if (!targets.length) {
-        el.targetState.innerHTML = '<option value="">No adjacent enemy</option>';
-        return;
-      }
-
-      targets.forEach((target) => {
-        const control = WORLD.getDominantControl(target);
-        const option = document.createElement('option');
-        option.value = target.id;
-        option.textContent = `${target.name} (${target.id}) · ${Math.round(control.share)}% ${campaign.factions[control.factionId].name}`;
-        el.targetState.append(option);
-      });
-    }
-
-    function populateStartStates(defaultId = 'TX') {
-      el.startState.innerHTML = DATA.STATES
-        .slice()
-        .sort((a, b) => a.name.localeCompare(b.name))
-        .map((state) => `<option value="${state.id}">${state.name} (${state.id})</option>`)
-        .join('');
-      el.startState.value = defaultId;
-    }
-
-    function render(campaign) {
-      renderResourceHeader(campaign);
-      renderAllocations(campaign);
-      renderDoctrineNote(campaign);
-      renderQueue(campaign);
-      renderSourceTargetOptions(campaign);
-      renderMap(campaign);
-      renderInspector(campaign);
-      renderFactionTable(campaign);
-      renderChronicle(campaign);
-      el.playerDoctrine.value = campaign.doctrineByFaction[campaign.playerFactionId];
-    }
-
-    async function loadingSequence() {
-      const lines = [
-        'Inspecting parchment atlas layers...',
-        'Checking 48-state adjacency codex...',
-        'Drafting medieval faction treaties...',
-        'Calibrating supply routes and ration tables...',
-        'Forging doctrine matrices and campaign logs...',
-        'Finalizing war room ledgers...'
-      ];
-
-      el.loadingLog.innerHTML = '';
-      for (let i = 0; i < lines.length; i += 1) {
-        const item = document.createElement('div');
-        item.textContent = lines[i];
-        el.loadingLog.prepend(item);
-        el.loadingBar.style.width = `${Math.round(((i + 1) / lines.length) * 100)}%`;
-        await new Promise((resolve) => setTimeout(resolve, 230 + i * 45));
-      }
-
-      await new Promise((resolve) => setTimeout(resolve, 260));
-      el.loadingScreen.style.opacity = '0';
-      await new Promise((resolve) => setTimeout(resolve, 560));
-      el.loadingScreen.classList.add('hidden-soft');
-    }
-
-    function wireEvents(controller) {
-      el.newCampaign.addEventListener('click', () => controller.startNewCampaign(el.startState.value));
-
-      [el.allocLevy, el.allocSiege, el.allocCivil].forEach((slider) => {
-        slider.addEventListener('input', () => controller.updateAllocations());
-      });
-
-      el.playerDoctrine.addEventListener('change', () => {
-        controller.setPlayerDoctrine(el.playerDoctrine.value);
-      });
-
-      el.sourceState.addEventListener('change', () => {
-        controller.refreshTargetOptions(el.sourceState.value);
-      });
-
-      el.queueCampaign.addEventListener('click', () => {
-        controller.queueCampaign(el.sourceState.value, el.targetState.value, el.playerDoctrine.value);
-      });
-
-      el.advanceSeason.addEventListener('click', () => controller.advanceSeason());
-      el.toggleAuto.addEventListener('click', () => controller.toggleAuto());
-
-      el.openSettings.addEventListener('click', () => {
-        el.settingsModal.classList.remove('hidden');
-        el.settingsModal.classList.add('flex');
-      });
-
-      el.closeSettings.addEventListener('click', () => {
-        el.settingsModal.classList.add('hidden');
-        el.settingsModal.classList.remove('flex');
-      });
-
-      el.exportSave.addEventListener('click', () => controller.exportSave());
-      el.wipeSave.addEventListener('click', () => controller.wipeSave());
-      el.importSave.addEventListener('click', () => controller.importSave());
-    }
-
-    return {
-      el,
-      render,
-      loadingSequence,
-      populateStartStates,
-      wireEvents,
-      normalizeAllocationInputs,
-      renderTargetOptionsFromSource,
+    const factionById = {
+      player: {
+        id: 'player',
+        name: `${playerState.name} Crown`,
+        color: '#6d3f30',
+        traitId: playerTrait.id,
+        traitName: playerTrait.name,
+        traitSummary: playerTrait.summary,
+        traitEffect: playerTrait.effect,
+        isPlayer: true,
+        aggression: 0,
+        doctrine: 'fabian',
+        capitalStateId: startStateId,
+        statesOwned: 0,
+        power: 0,
+        resources: { gold: 340, levies: 260, rations: 240 },
+      },
     };
-  })();
 
-  const CONTROLLER = (() => {
-    let campaign = null;
-    let autoHandle = null;
+    const nonPlayerStateIds = mapModel.states.map((state) => state.id).filter((stateId) => stateId !== startStateId);
+    const factionCount = clamp(Math.round(nonPlayerStateIds.length / 6.5), 6, 9);
+    const seeds = chooseFactionSeeds(nonPlayerStateIds, factionCount);
+    const clusters = expandFactionClusters(seeds, nonPlayerStateIds);
+    const assignedFactionByStateId = { [startStateId]: 'player' };
+    const usedNames = new Set();
 
-    function chronicle(message) {
-      if (!campaign) return;
-      campaign.chronicle.unshift(`Season ${campaign.season}: ${message}`);
-      campaign.chronicle = campaign.chronicle.slice(0, 180);
+    clusters.forEach((cluster, clusterIndex) => {
+      const factionId = `ai-${clusterIndex + 1}`;
+      const regionTally = {};
+      cluster.forEach((stateId) => {
+        const region = mapModel.statesById[stateId].region;
+        regionTally[region] = (regionTally[region] || 0) + 1;
+      });
+      const majorRegion = Object.entries(regionTally).sort((a, b) => b[1] - a[1])[0][0];
+      const trait = pickTrait(majorRegion);
+      const capitalStateId = randomItem(cluster);
+
+      factionById[factionId] = {
+        id: factionId,
+        name: pickFactionName(majorRegion, usedNames),
+        color: FACTION_COLORS[clusterIndex % FACTION_COLORS.length],
+        traitId: trait.id,
+        traitName: trait.name,
+        traitSummary: trait.summary,
+        traitEffect: trait.effect,
+        isPlayer: false,
+        aggression: 0.38 + Math.random() * 0.44,
+        doctrine: randomItem(['fabian', 'feigned', 'siege']),
+        capitalStateId,
+        statesOwned: 0,
+        power: 0,
+        resources: {
+          gold: 280 + cluster.length * randInt(24, 40),
+          levies: 220 + cluster.length * randInt(18, 30),
+          rations: 200 + cluster.length * randInt(14, 24),
+        },
+      };
+
+      cluster.forEach((stateId) => {
+        assignedFactionByStateId[stateId] = factionId;
+      });
+    });
+
+    const stateById = {};
+    mapModel.states.forEach((mapState) => {
+      const ownerFactionId = assignedFactionByStateId[mapState.id];
+      const terrainFactor = TERRAIN_MODIFIERS[mapState.terrain];
+      const prosperityBase = mapState.region === 'East' ? 78 : mapState.region === 'Midwest' ? 74 : mapState.region === 'South' ? 72 : mapState.region === 'Plains' ? 69 : 66;
+      const prosperity = clamp(Math.round((prosperityBase + randInt(-8, 8)) * terrainFactor.prosperity), 45, 95);
+      stateById[mapState.id] = {
+        id: mapState.id,
+        abbr: mapState.abbr,
+        name: mapState.name,
+        region: mapState.region,
+        terrain: mapState.terrain,
+        ownerFactionId,
+        levies: clamp(Math.round(prosperity * 1.55 + randInt(8, 36)), 40, 300),
+        supply: clamp(Math.round(58 * terrainFactor.supply + randInt(-8, 8)), 18, 120),
+        prosperity,
+        fort: clamp(Math.round(1 + (terrainFactor.defense - 1) * 8 + Math.random() * 2), 0, 6),
+        pressure: 50,
+        neighbors: [...mapState.neighbors],
+        centroid: [...mapState.centroid],
+        control: { [ownerFactionId]: 100 },
+        frontline: false,
+      };
+    });
+
+    const nextCampaign = {
+      version: SAVE_VERSION,
+      season: 1,
+      status: 'Live',
+      playerFactionId: 'player',
+      selectedStateId: startStateId,
+      allocations: { levies: 45, siege: 30, civil: 25 },
+      queue: [],
+      chronicle: [`Season 1: ${factionById.player.name} claims ${playerState.name} and calls banners to war.`],
+      factionsById: factionById,
+      statesById: stateById,
+      vectors: [],
+      camera: { x: 0, y: 0, scale: 1 },
+    };
+
+    refreshOwnershipAndFrontline(nextCampaign);
+    recalcFactionPower(nextCampaign);
+    return nextCampaign;
+  }
+
+  function normalizeControl(controlObj, ownerId) {
+    const next = {};
+    let total = 0;
+    Object.entries(controlObj).forEach(([factionId, value]) => {
+      if (value <= 0.05) return;
+      next[factionId] = value;
+      total += value;
+    });
+    if (total <= 0) {
+      next[ownerId] = 100;
+      total = 100;
     }
+    Object.keys(next).forEach((factionId) => {
+      next[factionId] = (next[factionId] / total) * 100;
+    });
+    return next;
+  }
 
-    function saveAuto() {
-      if (!campaign) return;
-      STORE.save(campaign);
+  function dominantControl(stateRecord) {
+    const sorted = Object.entries(stateRecord.control).sort((a, b) => b[1] - a[1]);
+    return { factionId: sorted[0][0], share: sorted[0][1] };
+  }
+
+  function transferControl(stateRecord, attackerId, shift) {
+    const nextControl = { ...stateRecord.control };
+    if (!nextControl[attackerId]) nextControl[attackerId] = 0;
+    if (shift > 0) {
+      let remaining = shift;
+      const victims = Object.entries(nextControl).filter(([id]) => id !== attackerId).sort((a, b) => b[1] - a[1]);
+      victims.forEach(([victimId]) => {
+        if (remaining <= 0) return;
+        const taken = Math.min(nextControl[victimId], remaining);
+        nextControl[victimId] -= taken;
+        nextControl[attackerId] += taken;
+        remaining -= taken;
+      });
+    } else if (shift < 0) {
+      const retreat = Math.abs(shift);
+      const defenders = Object.entries(nextControl).filter(([id]) => id !== attackerId).sort((a, b) => b[1] - a[1]);
+      if (defenders.length) {
+        const beneficiaryId = defenders[0][0];
+        const returned = Math.min(nextControl[attackerId], retreat);
+        nextControl[attackerId] -= returned;
+        nextControl[beneficiaryId] += returned;
+      }
     }
+    stateRecord.control = normalizeControl(nextControl, stateRecord.ownerFactionId);
+    const dominant = dominantControl(stateRecord);
+    stateRecord.ownerFactionId = dominant.factionId;
+  }
 
-    function setCampaign(nextCampaign, appendMessage = '') {
-      campaign = nextCampaign;
-      if (appendMessage) chronicle(appendMessage);
-      WORLD.refreshOwnershipAndFrontline(campaign);
-      WORLD.recalculateFactionPower(campaign);
-      UI.render(campaign);
-    }
+  function refreshOwnershipAndFrontline(c) {
+    Object.values(c.factionsById).forEach((faction) => {
+      faction.statesOwned = 0;
+    });
 
-    function stopAuto() {
-      if (!autoHandle) return;
-      clearInterval(autoHandle);
-      autoHandle = null;
-      if (campaign) campaign.autoAdvance = false;
-      UI.el.toggleAuto.textContent = 'Auto: Off';
-    }
+    Object.values(c.statesById).forEach((stateRecord) => {
+      stateRecord.control = normalizeControl(stateRecord.control, stateRecord.ownerFactionId);
+      const dominant = dominantControl(stateRecord);
+      stateRecord.ownerFactionId = dominant.factionId;
+      if (c.factionsById[stateRecord.ownerFactionId]) {
+        c.factionsById[stateRecord.ownerFactionId].statesOwned += 1;
+      }
+    });
 
-    function startAuto() {
-      if (autoHandle) return;
-      campaign.autoAdvance = true;
-      UI.el.toggleAuto.textContent = 'Auto: On';
-      autoHandle = setInterval(() => {
-        if (!campaign || campaign.status === 'Victory' || campaign.status === 'Defeat') {
-          stopAuto();
+    Object.values(c.statesById).forEach((stateRecord) => {
+      stateRecord.frontline = stateRecord.neighbors.some((neighborId) => c.statesById[neighborId].ownerFactionId !== stateRecord.ownerFactionId);
+    });
+
+    Object.values(c.factionsById).forEach((faction) => {
+      if (faction.statesOwned <= 0) return;
+      if (!c.statesById[faction.capitalStateId] || c.statesById[faction.capitalStateId].ownerFactionId !== faction.id) {
+        const replacement = Object.values(c.statesById)
+          .filter((stateRecord) => stateRecord.ownerFactionId === faction.id)
+          .sort((a, b) => b.prosperity - a.prosperity)[0];
+        if (replacement) faction.capitalStateId = replacement.id;
+      }
+    });
+  }
+
+  function recalcFactionPower(c) {
+    Object.values(c.factionsById).forEach((faction) => {
+      if (faction.statesOwned <= 0) {
+        faction.power = 0;
+        return;
+      }
+      const holdings = Object.values(c.statesById).filter((stateRecord) => stateRecord.ownerFactionId === faction.id);
+      const levySum = holdings.reduce((sum, stateRecord) => sum + stateRecord.levies, 0);
+      const supplySum = holdings.reduce((sum, stateRecord) => sum + stateRecord.supply, 0);
+      faction.power = Math.round(
+        levySum * 0.57
+        + supplySum * 0.35
+        + faction.resources.gold * 0.17
+        + faction.resources.rations * 0.12
+        + holdings.length * 32
+      );
+    });
+  }
+
+  function isSupplyConnected(c, factionId, stateId) {
+    const faction = c.factionsById[factionId];
+    if (!faction || faction.statesOwned <= 0) return false;
+    if (faction.capitalStateId === stateId) return true;
+
+    const queue = [faction.capitalStateId];
+    const seen = new Set([faction.capitalStateId]);
+
+    while (queue.length) {
+      const currentId = queue.shift();
+      const currentState = c.statesById[currentId];
+      currentState.neighbors.forEach((neighborId) => {
+        if (seen.has(neighborId)) return;
+        const neighborState = c.statesById[neighborId];
+        if (neighborState.ownerFactionId !== factionId) return;
+        if (neighborId === stateId) {
+          seen.add(neighborId);
+          queue.length = 0;
           return;
         }
-        advanceSeason();
-      }, 1400);
-    }
-
-    function startNewCampaign(startStateId) {
-      stopAuto();
-      const fresh = WORLD.createCampaign(startStateId);
-      setCampaign(fresh, `New chronicle opened with ${DATA.LOOKUP[startStateId].name} as your seat.`);
-      saveAuto();
-    }
-
-    function updateAllocations() {
-      if (!campaign) return;
-      UI.normalizeAllocationInputs(campaign);
-      chronicle(`Treasury allocation set to Levies ${campaign.allocations.levy}% / Siegeworks ${campaign.allocations.siege}% / Civil ${campaign.allocations.civil}%.`);
-      UI.render(campaign);
-    }
-
-    function setPlayerDoctrine(doctrineKey) {
-      if (!campaign || !DATA.DOCTRINES[doctrineKey]) return;
-      campaign.doctrineByFaction[campaign.playerFactionId] = doctrineKey;
-      chronicle(`Doctrine shifted to ${DATA.DOCTRINES[doctrineKey].label}.`);
-      UI.render(campaign);
-    }
-
-    function refreshTargetOptions(sourceStateId) {
-      if (!campaign) return;
-      UI.renderTargetOptionsFromSource(campaign, sourceStateId);
-    }
-
-    function queueCampaign(sourceId, targetId, doctrineKey) {
-      if (!campaign) return;
-      const result = ENGINE.queueCampaign(campaign, sourceId, targetId, doctrineKey);
-      chronicle(result.reason);
-      UI.render(campaign);
-    }
-
-    function advanceSeason() {
-      if (!campaign) return;
-      if (campaign.status === 'Victory' || campaign.status === 'Defeat') {
-        stopAuto();
-        return;
-      }
-      ENGINE.runSeason(campaign);
-      saveAuto();
-      UI.render(campaign);
-      if (campaign.status === 'Victory' || campaign.status === 'Defeat') {
-        stopAuto();
-      }
-    }
-
-    function toggleAuto() {
-      if (!campaign) return;
-      if (autoHandle) {
-        stopAuto();
-      } else {
-        startAuto();
-      }
-    }
-
-    function exportSave() {
-      if (!campaign) return;
-      STORE.exportFile(campaign);
-      chronicle('Campaign exported to JSON.');
-      UI.render(campaign);
-    }
-
-    function wipeSave() {
-      STORE.wipe();
-      chronicle('Local autosave wiped.');
-      UI.render(campaign);
-    }
-
-    async function importSave() {
-      if (!campaign) return;
-      const file = UI.el.importFile.files?.[0];
-      if (!file) {
-        chronicle('Select a save file first.');
-        UI.render(campaign);
-        return;
-      }
-      try {
-        const imported = await STORE.importFile(file);
-        stopAuto();
-        setCampaign(imported, 'Campaign imported from file.');
-        saveAuto();
-      } catch (error) {
-        chronicle(error.message);
-        UI.render(campaign);
-      }
-    }
-
-    function loadOrCreate() {
-      const existing = STORE.load();
-      if (existing) {
-        setCampaign(existing, 'Autosave restored from local storage.');
-      } else {
-        setCampaign(WORLD.createCampaign(UI.el.startState.value || 'TX'));
-      }
-    }
-
-    async function init() {
-      UI.populateStartStates('TX');
-      UI.wireEvents({
-        startNewCampaign,
-        updateAllocations,
-        setPlayerDoctrine,
-        refreshTargetOptions,
-        queueCampaign,
-        advanceSeason,
-        toggleAuto,
-        exportSave,
-        wipeSave,
-        importSave,
+        seen.add(neighborId);
+        queue.push(neighborId);
       });
-      await UI.loadingSequence();
-      loadOrCreate();
+      if (seen.has(stateId)) return true;
     }
+
+    return seen.has(stateId);
+  }
+
+  function visibleStateSet(c) {
+    const set = new Set();
+    Object.values(c.statesById).forEach((stateRecord) => {
+      if (stateRecord.ownerFactionId === c.playerFactionId) {
+        set.add(stateRecord.id);
+        stateRecord.neighbors.forEach((neighborId) => set.add(neighborId));
+      }
+    });
+    return set;
+  }
+
+  function produceEconomy(c) {
+    Object.values(c.factionsById).forEach((faction) => {
+      if (faction.statesOwned <= 0) return;
+      const states = Object.values(c.statesById).filter((stateRecord) => stateRecord.ownerFactionId === faction.id);
+
+      let levyShare;
+      let siegeShare;
+      let civilShare;
+
+      if (faction.isPlayer) {
+        levyShare = c.allocations.levies / 100;
+        siegeShare = c.allocations.siege / 100;
+        civilShare = c.allocations.civil / 100;
+      } else {
+        levyShare = clamp(0.34 + faction.aggression * 0.4, 0.3, 0.74);
+        siegeShare = clamp(0.16 + faction.aggression * 0.22, 0.12, 0.42);
+        civilShare = clamp(1 - levyShare - siegeShare, 0.08, 0.34);
+      }
+
+      const trait = faction.traitEffect;
+      const civicIndex = states.reduce((sum, stateRecord) => {
+        const terrainProsperity = TERRAIN_MODIFIERS[stateRecord.terrain].prosperity;
+        return sum + stateRecord.prosperity * terrainProsperity;
+      }, 0);
+
+      const levyGain = civicIndex * 0.2 * levyShare * trait.levy;
+      const goldGain = civicIndex * (0.2 + 0.3 * civilShare) * trait.gold;
+      const rationGain = civicIndex * (0.17 + 0.25 * civilShare) * trait.ration;
+      faction.resources.levies = clamp(faction.resources.levies + levyGain, 0, 999999);
+      faction.resources.gold = clamp(faction.resources.gold + goldGain, 0, 999999);
+      faction.resources.rations = clamp(faction.resources.rations + rationGain, 0, 999999);
+
+      const perStateLevies = levyGain / Math.max(states.length, 1);
+      const perStateSupply = rationGain / Math.max(states.length, 1) / 16;
+
+      states.forEach((stateRecord) => {
+        stateRecord.levies = clamp(stateRecord.levies + Math.round(perStateLevies * (0.72 + Math.random() * 0.5)), 8, 460);
+        stateRecord.supply = clamp(stateRecord.supply + Math.round(perStateSupply * (0.84 + Math.random() * 0.45)), 10, 140);
+      });
+    });
+  }
+
+  function estimateCampaign(c, action) {
+    const source = c.statesById[action.sourceId];
+    const target = c.statesById[action.targetId];
+    const attackerFaction = c.factionsById[action.attackerFactionId];
+    const defenderFaction = c.factionsById[target.ownerFactionId];
+    const attackerDoctrine = DOCTRINES[action.doctrineKey];
+    const defenderDoctrineKey = defenderFaction.doctrine;
+    const defenderDoctrine = DOCTRINES[defenderDoctrineKey];
+
+    const sourceConnected = isSupplyConnected(c, attackerFaction.id, source.id);
+    const supplyFactor = sourceConnected ? 1.0 : 0.7;
+    const rationPressure = clamp((attackerFaction.resources.rations + source.supply * 2) / Math.max(attackerFaction.statesOwned * 170, 1), 0.56, 1.28);
+    const doctrineEdge = doctrineAdvantage(action.doctrineKey, defenderDoctrineKey);
+    const terrainDefense = TERRAIN_MODIFIERS[target.terrain].defense;
+
+    const attackPower = source.levies
+      * attackerDoctrine.attack
+      * attackerFaction.traitEffect.levy
+      * attackerDoctrine.supply
+      * supplyFactor
+      * rationPressure
+      * doctrineEdge;
+
+    const defensePower = target.levies
+      * defenderDoctrine.defense
+      * defenderFaction.traitEffect.defense
+      * terrainDefense
+      * (1 + target.fort * 0.06);
 
     return {
-      init,
+      ratio: attackPower / Math.max(defensePower, 1),
+      sourceConnected,
+      defenderDoctrineKey,
     };
-  })();
+  }
 
-  CONTROLLER.init();
+  function queueAttackVector(c, sourceId, targetId, attackerFactionId) {
+    const source = c.statesById[sourceId];
+    const target = c.statesById[targetId];
+    c.vectors.push({
+      from: [...source.centroid],
+      to: [...target.centroid],
+      ttl: 90,
+      maxTtl: 90,
+      attackerFactionId,
+    });
+  }
+
+  function executeCampaignAction(c, action, visibilitySetForFog) {
+    const source = c.statesById[action.sourceId];
+    const target = c.statesById[action.targetId];
+    if (!source || !target) return null;
+    if (source.ownerFactionId !== action.attackerFactionId) return null;
+    if (target.ownerFactionId === action.attackerFactionId) return null;
+    if (!source.neighbors.includes(target.id)) return null;
+    if (source.levies < 22) return null;
+
+    const attackerFaction = c.factionsById[action.attackerFactionId];
+    const defenderFaction = c.factionsById[target.ownerFactionId];
+    const doctrine = DOCTRINES[action.doctrineKey];
+
+    const estimate = estimateCampaign(c, action);
+    const intensity = clamp(action.intensity ?? 50, 0, 100);
+    const intensityFactor = 0.75 + intensity / 100 * 0.5;
+    const shiftBase = (estimate.ratio - 0.86) * 15 * doctrine.siege * attackerFaction.traitEffect.siege * intensityFactor;
+    const disconnectedPenalty = estimate.sourceConnected ? 0 : 3;
+    const randomSwing = 0.9 + Math.random() * 0.22;
+    let controlShift = Math.round(clamp((shiftBase - disconnectedPenalty) * randomSwing, -11, 20));
+
+    if ((target.control[target.ownerFactionId] || 0) < 18 && controlShift < 0) {
+      controlShift = Math.min(0, controlShift + 3);
+    }
+
+    const commitment = Math.max(24, source.levies * 0.4);
+    const attackerLossBase = commitment * (0.12 + 0.21 * (1 / Math.max(estimate.ratio, 0.35)));
+    const defenderLossBase = commitment * (0.1 + 0.24 * Math.max(estimate.ratio, 0.48));
+    const attritionLoss = estimate.sourceConnected ? 0 : commitment * 0.08;
+
+    const attackerLoss = Math.max(8, attackerLossBase + attritionLoss);
+    const defenderLoss = Math.max(6, defenderLossBase * (controlShift > 0 ? 1.06 : 0.79));
+
+    source.levies = clamp(source.levies - Math.round(attackerLoss), 6, 520);
+    target.levies = clamp(target.levies - Math.round(defenderLoss), 6, 520);
+    source.supply = clamp(source.supply - Math.round(4 + (estimate.sourceConnected ? 2 : 9)), 8, 140);
+    target.supply = clamp(target.supply - Math.round(controlShift > 0 ? 6 : 3), 8, 140);
+
+    attackerFaction.resources.rations = clamp(attackerFaction.resources.rations - attackerLoss * 0.45, 0, 999999);
+    defenderFaction.resources.rations = clamp(defenderFaction.resources.rations - defenderLoss * 0.28, 0, 999999);
+    attackerFaction.resources.levies = clamp(attackerFaction.resources.levies - attackerLoss * 0.52, 0, 999999);
+    defenderFaction.resources.levies = clamp(defenderFaction.resources.levies - defenderLoss * 0.33, 0, 999999);
+
+    const ownerBefore = target.ownerFactionId;
+    transferControl(target, action.attackerFactionId, controlShift);
+    const ownerAfter = target.ownerFactionId;
+
+    queueAttackVector(c, source.id, target.id, action.attackerFactionId);
+
+    const attackerVisible = visibilitySetForFog.has(source.id) || visibilitySetForFog.has(target.id);
+    if (!attackerVisible && !attackerFaction.isPlayer) {
+      return `Rumors of fierce fighting spread beyond ${target.region}. The map’s ink shifts overnight.`;
+    }
+
+    if (ownerBefore !== ownerAfter) {
+      return `${attackerFaction.name} captures ${target.name} from ${defenderFaction.name} (${Math.max(controlShift, 1)}% border swing).`;
+    }
+    if (controlShift > 0) {
+      return `${attackerFaction.name} pushes deeper into ${target.name} (+${controlShift}% control).`;
+    }
+    return `${attackerFaction.name} is repelled at ${target.name} after heavy losses.`;
+  }
+
+  function chooseAIDoctrine(c, faction, sourceState, targetState) {
+    const connected = isSupplyConnected(c, faction.id, sourceState.id);
+    if (!connected || faction.resources.rations < faction.statesOwned * 82) return 'fabian';
+    if ((targetState.terrain === 'mountain' || targetState.terrain === 'hills') && faction.aggression > 0.55) return 'siege';
+    if (faction.aggression > 0.65) return 'feigned';
+    return faction.doctrine;
+  }
+
+  function planAIActions(c) {
+    const plans = [];
+    Object.values(c.factionsById).forEach((faction) => {
+      if (faction.isPlayer || faction.statesOwned <= 0) return;
+      const frontlineStates = Object.values(c.statesById).filter((stateRecord) => stateRecord.ownerFactionId === faction.id && stateRecord.frontline && stateRecord.levies >= 34);
+      if (!frontlineStates.length) return;
+
+      const candidateActions = [];
+      frontlineStates.forEach((sourceState) => {
+        sourceState.neighbors.forEach((neighborId) => {
+          const targetState = c.statesById[neighborId];
+          if (targetState.ownerFactionId === faction.id) return;
+          const doctrineKey = chooseAIDoctrine(c, faction, sourceState, targetState);
+          const estimate = estimateCampaign(c, {
+            attackerFactionId: faction.id,
+            sourceId: sourceState.id,
+            targetId: targetState.id,
+            doctrineKey,
+          });
+          const strategicValue = targetState.prosperity * 0.14 + (100 - (targetState.control[targetState.ownerFactionId] || 0)) * 0.15 - targetState.fort * 1.8;
+          const score = estimate.ratio * 18 + strategicValue;
+          candidateActions.push({
+            attackerFactionId: faction.id,
+            sourceId: sourceState.id,
+            targetId: targetState.id,
+            doctrineKey,
+            intensity: randInt(34, 82),
+            score,
+          });
+        });
+      });
+
+      candidateActions.sort((a, b) => b.score - a.score);
+      const desired = faction.aggression > 0.68 ? 2 : 1;
+      const usedPairs = new Set();
+      for (const action of candidateActions) {
+        if (usedPairs.size >= desired) break;
+        const key = `${action.sourceId}:${action.targetId}`;
+        if (usedPairs.has(key)) continue;
+        usedPairs.add(key);
+        plans.push(action);
+      }
+    });
+
+    return plans;
+  }
+
+  function applySupplyAttrition(c, visibility) {
+    const notes = [];
+    Object.values(c.factionsById).forEach((faction) => {
+      if (faction.statesOwned <= 0) return;
+      const states = Object.values(c.statesById).filter((stateRecord) => stateRecord.ownerFactionId === faction.id);
+      let isolated = 0;
+      states.forEach((stateRecord) => {
+        const connected = isSupplyConnected(c, faction.id, stateRecord.id);
+        if (!connected) {
+          isolated += 1;
+          const loss = Math.max(4, Math.round(stateRecord.levies * 0.08));
+          stateRecord.levies = clamp(stateRecord.levies - loss, 6, 520);
+          stateRecord.supply = clamp(stateRecord.supply - randInt(6, 14), 6, 140);
+          faction.resources.rations = clamp(faction.resources.rations - loss * 0.45, 0, 999999);
+        }
+      });
+      if (isolated > 0) {
+        const visibleFaction = states.some((stateRecord) => visibility.has(stateRecord.id));
+        if (faction.isPlayer || visibleFaction) {
+          notes.push(`${faction.name} suffers supply attrition across ${isolated} isolated holdings.`);
+        }
+      }
+    });
+    return notes;
+  }
+
+  function updateCampaignStatus(c, notes) {
+    const playerStates = Object.values(c.statesById).filter((stateRecord) => stateRecord.ownerFactionId === c.playerFactionId).length;
+    if (playerStates <= 0) {
+      c.status = 'Defeat';
+      notes.push('Your standard falls. No territories remain under direct rule.');
+      stopAutoAdvance();
+      return;
+    }
+    if (playerStates === mapModel.states.length) {
+      c.status = 'Victory';
+      notes.push('All 48 continental states answer to your throne.');
+      stopAutoAdvance();
+      return;
+    }
+    c.status = playerStates >= 24 ? 'Dominant' : 'Live';
+  }
+
+  function runSeason() {
+    if (!campaign) return;
+    if (campaign.status === 'Victory' || campaign.status === 'Defeat') return;
+
+    const seasonNotes = [];
+    const visibility = visibleStateSet(campaign);
+
+    produceEconomy(campaign);
+
+    if (campaign.queue.length) {
+      const queuedActions = [...campaign.queue];
+      campaign.queue.length = 0;
+      queuedActions.forEach((action) => {
+        const result = executeCampaignAction(campaign, action, visibility);
+        if (result) seasonNotes.push(result);
+      });
+    }
+
+    const aiActions = planAIActions(campaign);
+    aiActions.forEach((action) => {
+      const result = executeCampaignAction(campaign, action, visibility);
+      if (result) seasonNotes.push(result);
+    });
+
+    applySupplyAttrition(campaign, visibility).forEach((note) => seasonNotes.push(note));
+
+    refreshOwnershipAndFrontline(campaign);
+    recalcFactionPower(campaign);
+
+    campaign.season += 1;
+    updateCampaignStatus(campaign, seasonNotes);
+
+    seasonNotes.slice(0, 10).reverse().forEach((note) => {
+      campaign.chronicle.unshift(`Season ${campaign.season - 1}: ${note}`);
+    });
+    campaign.chronicle = campaign.chronicle.slice(0, 200);
+
+    persistCampaign();
+    renderAll();
+  }
+
+  function queueCampaignAction() {
+    if (!campaign) return;
+    const sourceId = EL.sourceState.value;
+    const targetId = EL.targetState.value;
+    const doctrineKey = EL.campaignDoctrine.value;
+    if (!sourceId || !targetId) return;
+    const sourceState = campaign.statesById[sourceId];
+    const targetState = campaign.statesById[targetId];
+    if (!sourceState || !targetState) return;
+    if (sourceState.ownerFactionId !== campaign.playerFactionId) return;
+    if (targetState.ownerFactionId === campaign.playerFactionId) return;
+    if (!sourceState.neighbors.includes(targetId)) return;
+    if (campaign.queue.length >= 6) {
+      campaign.chronicle.unshift(`Season ${campaign.season}: Maneuver queue is full.`);
+      renderAll();
+      return;
+    }
+
+    const intensity = clamp(sourceState.pressure || 50, 0, 100);
+    campaign.queue.push({
+      id: `q-${Math.random().toString(36).slice(2, 7)}`,
+      attackerFactionId: campaign.playerFactionId,
+      sourceId,
+      targetId,
+      doctrineKey,
+      intensity,
+    });
+    campaign.chronicle.unshift(`Season ${campaign.season}: Maneuver queued ${sourceState.abbr} -> ${targetState.abbr} (${DOCTRINES[doctrineKey].label}).`);
+    campaign.chronicle = campaign.chronicle.slice(0, 200);
+    renderAll();
+  }
+
+  function updatePlayerDoctrine(doctrineKey) {
+    if (!campaign || !DOCTRINES[doctrineKey]) return;
+    campaign.factionsById[campaign.playerFactionId].doctrine = doctrineKey;
+    campaign.chronicle.unshift(`Season ${campaign.season}: Royal doctrine shifted to ${DOCTRINES[doctrineKey].label}.`);
+    campaign.chronicle = campaign.chronicle.slice(0, 200);
+    renderAll();
+  }
+
+  function applyAllocationInputs() {
+    if (!campaign) return;
+    let levies = Number(EL.allocLevies.value);
+    let siege = Number(EL.allocSiege.value);
+    let civil = Number(EL.allocCivil.value);
+    const total = levies + siege + civil;
+    if (total !== 100) {
+      civil = clamp(civil + (100 - total), 10, 60);
+    }
+    campaign.allocations = { levies, siege, civil };
+    EL.allocLevies.value = String(levies);
+    EL.allocSiege.value = String(siege);
+    EL.allocCivil.value = String(civil);
+    renderAllocationReadouts();
+  }
+
+  function renderAllocationReadouts() {
+    EL.allocLeviesReadout.textContent = toFixedPercent(Number(EL.allocLevies.value));
+    EL.allocSiegeReadout.textContent = toFixedPercent(Number(EL.allocSiege.value));
+    EL.allocCivilReadout.textContent = toFixedPercent(Number(EL.allocCivil.value));
+  }
+
+  function renderDoctrineOptions() {
+    const options = Object.values(DOCTRINES)
+      .map((doctrine) => `<option value="${doctrine.key}">${doctrine.label}</option>`)
+      .join('');
+    EL.playerDoctrine.innerHTML = options;
+    EL.campaignDoctrine.innerHTML = options;
+  }
+
+  function renderStartStateOptions(defaultStateId = '48') {
+    EL.startState.innerHTML = mapModel.states
+      .slice()
+      .sort((a, b) => a.name.localeCompare(b.name))
+      .map((state) => `<option value="${state.id}">${state.name} (${state.abbr})</option>`)
+      .join('');
+    EL.startState.value = defaultStateId;
+  }
+
+  function renderSourceTargetOptions() {
+    if (!campaign) return;
+    const sources = Object.values(campaign.statesById)
+      .filter((stateRecord) => stateRecord.ownerFactionId === campaign.playerFactionId && stateRecord.frontline)
+      .sort((a, b) => b.levies - a.levies || a.name.localeCompare(b.name));
+
+    EL.sourceState.innerHTML = '';
+    if (!sources.length) {
+      EL.sourceState.innerHTML = '<option value="">No frontline territory</option>';
+      EL.targetState.innerHTML = '<option value="">No adjacent target</option>';
+      return;
+    }
+
+    sources.forEach((stateRecord) => {
+      const option = document.createElement('option');
+      option.value = stateRecord.id;
+      option.textContent = `${stateRecord.name} (${stateRecord.abbr})`;
+      EL.sourceState.append(option);
+    });
+
+    if (!sources.some((stateRecord) => stateRecord.id === EL.sourceState.value)) {
+      EL.sourceState.value = sources[0].id;
+    }
+
+    renderTargetOptions(EL.sourceState.value);
+  }
+
+  function renderTargetOptions(sourceStateId) {
+    if (!campaign) return;
+    const sourceState = campaign.statesById[sourceStateId];
+    EL.targetState.innerHTML = '';
+    if (!sourceState) {
+      EL.targetState.innerHTML = '<option value="">No adjacent target</option>';
+      return;
+    }
+
+    const targets = sourceState.neighbors
+      .map((neighborId) => campaign.statesById[neighborId])
+      .filter((stateRecord) => stateRecord.ownerFactionId !== campaign.playerFactionId)
+      .sort((a, b) => (a.control[campaign.playerFactionId] || 0) - (b.control[campaign.playerFactionId] || 0));
+
+    if (!targets.length) {
+      EL.targetState.innerHTML = '<option value="">No adjacent target</option>';
+      return;
+    }
+
+    targets.forEach((targetState) => {
+      const dominant = dominantControl(targetState);
+      const option = document.createElement('option');
+      option.value = targetState.id;
+      option.textContent = `${targetState.name} (${targetState.abbr}) · ${Math.round(dominant.share)}% ${campaign.factionsById[dominant.factionId].name}`;
+      EL.targetState.append(option);
+    });
+  }
+
+  function chronicleListHtml() {
+    return campaign.chronicle
+      .slice(0, 36)
+      .map((entry) => `<div class="chronicle-item">${entry.replace(/</g, '&lt;').replace(/>/g, '&gt;')}</div>`)
+      .join('');
+  }
+
+  function renderChronicle() {
+    EL.chronicleLog.innerHTML = chronicleListHtml();
+  }
+
+  function renderQueue() {
+    if (!campaign.queue.length) {
+      EL.actionQueue.textContent = 'No maneuvers queued.';
+      return;
+    }
+    EL.actionQueue.innerHTML = campaign.queue
+      .map((action, index) => {
+        const sourceState = campaign.statesById[action.sourceId];
+        const targetState = campaign.statesById[action.targetId];
+        return `<div class="queue-item">${index + 1}. ${sourceState.abbr} -> ${targetState.abbr} · ${DOCTRINES[action.doctrineKey].label} · Pressure ${action.intensity}%</div>`;
+      })
+      .join('');
+  }
+
+  function visibilityForPlayer() {
+    return visibleStateSet(campaign);
+  }
+
+  function renderTheater() {
+    if (!campaign || !campaign.selectedStateId || !campaign.statesById[campaign.selectedStateId]) {
+      EL.theaterTitle.textContent = 'Select a state from the map.';
+      EL.theaterOwner.textContent = 'Control percentages and supply conditions appear here.';
+      EL.theaterControlLedger.innerHTML = '';
+      EL.theaterPressure.value = '50';
+      EL.theaterPressureReadout.textContent = '50%';
+      return;
+    }
+
+    const stateRecord = campaign.statesById[campaign.selectedStateId];
+    const owner = campaign.factionsById[stateRecord.ownerFactionId];
+    const visible = visibilityForPlayer().has(stateRecord.id) || stateRecord.ownerFactionId === campaign.playerFactionId;
+    const connected = isSupplyConnected(campaign, stateRecord.ownerFactionId, stateRecord.id);
+    const dominant = dominantControl(stateRecord);
+
+    EL.theaterTitle.textContent = `${stateRecord.name} (${stateRecord.abbr})`;
+    EL.theaterOwner.textContent = [
+      `Liege: ${owner.name}`,
+      visible ? `Levies ${Math.round(stateRecord.levies)} · Supply ${Math.round(stateRecord.supply)} · Fort ${stateRecord.fort}` : 'Enemy levy totals obscured by fog of war.',
+      `Dominant control: ${Math.round(dominant.share)}%`,
+      `Supply line: ${connected ? 'Connected' : 'Cut'}`,
+    ].join(' | ');
+
+    const controlRows = Object.entries(stateRecord.control)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 4)
+      .map(([factionId, share]) => `<div>${campaign.factionsById[factionId].name}: ${share.toFixed(1)}%</div>`)
+      .join('');
+    EL.theaterControlLedger.innerHTML = controlRows;
+
+    stateRecord.pressure = clamp(stateRecord.pressure ?? 50, 0, 100);
+    EL.theaterPressure.value = String(stateRecord.pressure);
+    EL.theaterPressureReadout.textContent = `${Math.round(stateRecord.pressure)}%`;
+  }
+
+  function blendHex(hex, amount) {
+    const normalized = hex.replace('#', '');
+    const r = parseInt(normalized.substring(0, 2), 16);
+    const g = parseInt(normalized.substring(2, 4), 16);
+    const b = parseInt(normalized.substring(4, 6), 16);
+    const clampColor = (value) => clamp(Math.round(value), 0, 255);
+    const blended = [
+      clampColor(r + (255 - r) * amount),
+      clampColor(g + (255 - g) * amount),
+      clampColor(b + (255 - b) * amount),
+    ];
+    return `rgb(${blended[0]}, ${blended[1]}, ${blended[2]})`;
+  }
+
+  function renderMapStateStyles() {
+    if (!campaign) return;
+    const pathElements = FILL_LAYER.querySelectorAll('.state-shape');
+    pathElements.forEach((pathElement) => {
+      const stateId = pathElement.getAttribute('data-state-id');
+      const stateRecord = campaign.statesById[stateId];
+      const dominant = dominantControl(stateRecord);
+      const ownerFaction = campaign.factionsById[dominant.factionId];
+      const contested = dominant.share < 86 || Object.values(stateRecord.control).filter((share) => share > 8).length > 1;
+      const brightness = (100 - dominant.share) / 170;
+      pathElement.style.fill = blendHex(ownerFaction.color, brightness);
+      pathElement.classList.toggle('state-contested', contested);
+      pathElement.classList.toggle('state-selected', campaign.selectedStateId === stateId);
+    });
+  }
+
+  function renderAttackVectors() {
+    if (!campaign) return;
+    VECTOR_LAYER.innerHTML = '';
+    const fragment = document.createDocumentFragment();
+    campaign.vectors.forEach((vector) => {
+      const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+      line.classList.add('attack-vector');
+      const opacity = clamp(vector.ttl / vector.maxTtl, 0.15, 1);
+      line.setAttribute('x1', String(vector.from[0]));
+      line.setAttribute('y1', String(vector.from[1]));
+      line.setAttribute('x2', String(vector.to[0]));
+      line.setAttribute('y2', String(vector.to[1]));
+      line.setAttribute('stroke-opacity', opacity.toFixed(2));
+      fragment.append(line);
+    });
+    VECTOR_LAYER.append(fragment);
+  }
+
+  function renderHUDMetrics() {
+    if (!campaign) return;
+    const playerFaction = campaign.factionsById[campaign.playerFactionId];
+    EL.metricLevies.textContent = shortNumber(playerFaction.resources.levies);
+    EL.metricGold.textContent = shortNumber(playerFaction.resources.gold);
+    EL.metricRations.textContent = shortNumber(playerFaction.resources.rations);
+    EL.metricSeason.textContent = String(campaign.season);
+    EL.metricRealm.textContent = playerFaction.name;
+    EL.metricHoldings.textContent = `${playerFaction.statesOwned} / 48`;
+    EL.metricStatus.textContent = campaign.status;
+    EL.playerDoctrine.value = playerFaction.doctrine;
+    EL.campaignDoctrine.value = playerFaction.doctrine;
+    EL.doctrineNote.textContent = DOCTRINES[playerFaction.doctrine].note;
+  }
+
+  function renderAll() {
+    if (!campaign) return;
+    renderHUDMetrics();
+    renderAllocationReadouts();
+    renderSourceTargetOptions();
+    renderQueue();
+    renderChronicle();
+    renderTheater();
+    renderMapStateStyles();
+    renderAttackVectors();
+  }
+
+  function applyCamera() {
+    CAMERA_GROUP.setAttribute('transform', `translate(${camera.x} ${camera.y}) scale(${camera.scale})`);
+  }
+
+  function clientToSvgPoint(clientX, clientY) {
+    const point = SVG.createSVGPoint();
+    point.x = clientX;
+    point.y = clientY;
+    const inverse = SVG.getScreenCTM().inverse();
+    return point.matrixTransform(inverse);
+  }
+
+  function screenPointFromWorld(worldX, worldY) {
+    const matrix = CAMERA_GROUP.getScreenCTM();
+    if (!matrix) return { x: -9999, y: -9999 };
+    return {
+      x: matrix.a * worldX + matrix.c * worldY + matrix.e,
+      y: matrix.b * worldX + matrix.d * worldY + matrix.f,
+    };
+  }
+
+  function setupPanZoom() {
+    ROOT.addEventListener('mousedown', (event) => {
+      const interactive = event.target.closest('.hud-panel, .hud-ribbon, button, select, input, #tutorial-overlay, #settings-overlay');
+      if (interactive || event.button !== 0) return;
+      dragging = true;
+      ROOT.classList.add('dragging');
+      dragStart = { x: event.clientX, y: event.clientY, camX: camera.x, camY: camera.y };
+    });
+
+    window.addEventListener('mousemove', (event) => {
+      if (!dragging) return;
+      const rect = SVG.getBoundingClientRect();
+      const scaleX = SVG.viewBox.baseVal.width / rect.width;
+      const scaleY = SVG.viewBox.baseVal.height / rect.height;
+      const dx = (event.clientX - dragStart.x) * scaleX;
+      const dy = (event.clientY - dragStart.y) * scaleY;
+      camera.x = dragStart.camX + dx;
+      camera.y = dragStart.camY + dy;
+      applyCamera();
+    });
+
+    window.addEventListener('mouseup', () => {
+      dragging = false;
+      ROOT.classList.remove('dragging');
+    });
+
+    ROOT.addEventListener('wheel', (event) => {
+      const interactive = event.target.closest('.hud-panel, .hud-ribbon, button, select, input, #tutorial-overlay, #settings-overlay');
+      if (interactive) return;
+      event.preventDefault();
+      const svgPoint = clientToSvgPoint(event.clientX, event.clientY);
+      const beforeX = (svgPoint.x - camera.x) / camera.scale;
+      const beforeY = (svgPoint.y - camera.y) / camera.scale;
+      const zoomFactor = Math.exp(-event.deltaY * 0.0014);
+      const nextScale = clamp(camera.scale * zoomFactor, 0.75, 4.6);
+      camera.scale = nextScale;
+      camera.x = svgPoint.x - beforeX * camera.scale;
+      camera.y = svgPoint.y - beforeY * camera.scale;
+      applyCamera();
+    }, { passive: false });
+  }
+
+  function resizeCanvas() {
+    const dpr = window.devicePixelRatio || 1;
+    const width = Math.floor(window.innerWidth * dpr);
+    const height = Math.floor(window.innerHeight * dpr);
+    if (ASH_CANVAS.width !== width || ASH_CANVAS.height !== height) {
+      ASH_CANVAS.width = width;
+      ASH_CANVAS.height = height;
+      ASH_CANVAS.style.width = `${window.innerWidth}px`;
+      ASH_CANVAS.style.height = `${window.innerHeight}px`;
+    }
+  }
+
+  function spawnParticlesForContestedStates() {
+    if (!campaign) return;
+    const contestedStates = Object.values(campaign.statesById).filter((stateRecord) => {
+      const controlValues = Object.values(stateRecord.control).sort((a, b) => b - a);
+      return controlValues.length > 1 && controlValues[0] < 90;
+    });
+
+    contestedStates.forEach((stateRecord) => {
+      if (Math.random() > 0.16) return;
+      const point = screenPointFromWorld(stateRecord.centroid[0], stateRecord.centroid[1]);
+      if (point.x < -40 || point.x > window.innerWidth + 40 || point.y < -40 || point.y > window.innerHeight + 40) return;
+      particles.push({
+        x: point.x + (Math.random() - 0.5) * 16,
+        y: point.y + (Math.random() - 0.5) * 9,
+        vx: (Math.random() - 0.5) * 0.24,
+        vy: -(0.25 + Math.random() * 0.66),
+        life: 36 + Math.random() * 32,
+        maxLife: 64,
+        size: 1 + Math.random() * 1.9,
+      });
+    });
+  }
+
+  function animateLayer(timestamp) {
+    if (!lastFrameTime) lastFrameTime = timestamp;
+    const delta = timestamp - lastFrameTime;
+    lastFrameTime = timestamp;
+
+    resizeCanvas();
+    const ctx = ASH_CANVAS.getContext('2d');
+    ctx.clearRect(0, 0, ASH_CANVAS.width, ASH_CANVAS.height);
+    ctx.save();
+    const dpr = window.devicePixelRatio || 1;
+    ctx.scale(dpr, dpr);
+
+    spawnParticlesForContestedStates();
+
+    for (let i = particles.length - 1; i >= 0; i -= 1) {
+      const particle = particles[i];
+      particle.x += particle.vx * (delta / 16);
+      particle.y += particle.vy * (delta / 16);
+      particle.life -= delta / 16;
+      if (particle.life <= 0) {
+        particles.splice(i, 1);
+        continue;
+      }
+      const alpha = clamp(particle.life / particle.maxLife, 0, 1);
+      ctx.beginPath();
+      ctx.fillStyle = `rgba(94, 42, 42, ${alpha * 0.36})`;
+      ctx.arc(particle.x, particle.y, particle.size, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    ctx.restore();
+
+    if (campaign) {
+      campaign.vectors = campaign.vectors
+        .map((vector) => ({ ...vector, ttl: vector.ttl - delta / 18 }))
+        .filter((vector) => vector.ttl > 0);
+      renderAttackVectors();
+    }
+
+    animationHandle = requestAnimationFrame(animateLayer);
+  }
+
+  function stopAutoAdvance() {
+    if (autoTimer) {
+      clearInterval(autoTimer);
+      autoTimer = null;
+    }
+    EL.toggleAuto.textContent = 'Auto: Off';
+  }
+
+  function startAutoAdvance() {
+    if (autoTimer) return;
+    autoTimer = setInterval(() => {
+      runSeason();
+      if (campaign.status === 'Victory' || campaign.status === 'Defeat') {
+        stopAutoAdvance();
+      }
+    }, 1400);
+    EL.toggleAuto.textContent = 'Auto: On';
+  }
+
+  function toggleAutoAdvance() {
+    if (autoTimer) {
+      stopAutoAdvance();
+    } else {
+      startAutoAdvance();
+    }
+  }
+
+  function setupPanelToggle(button, panel, axisClass) {
+    button.addEventListener('click', () => {
+      panel.classList.toggle('panel-collapsed');
+      panel.classList.toggle(axisClass);
+    });
+  }
+
+  function openSettings() {
+    EL.settingsOverlay.style.display = 'flex';
+  }
+
+  function closeSettings() {
+    EL.settingsOverlay.style.display = 'none';
+  }
+
+  function exportCampaign() {
+    if (!campaign) return;
+    const serialized = serializeCampaign(campaign);
+    const blob = new Blob([JSON.stringify(serialized, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `abhi-state-war-sim-season-${campaign.season}.json`;
+    document.body.append(link);
+    link.click();
+    link.remove();
+    URL.revokeObjectURL(url);
+    campaign.chronicle.unshift(`Season ${campaign.season}: Campaign exported.`);
+    renderAll();
+  }
+
+  function wipeSave() {
+    localStorage.removeItem(STORAGE_KEY);
+    if (campaign) {
+      campaign.chronicle.unshift(`Season ${campaign.season}: Local campaign save wiped.`);
+      renderAll();
+    }
+  }
+
+  function serializeCampaign(c) {
+    const stateControl = [];
+    Object.values(c.statesById).forEach((stateRecord) => {
+      Object.entries(stateRecord.control).forEach(([factionId, percent]) => {
+        stateControl.push({
+          stateId: stateRecord.id,
+          factionId,
+          percent: Number(percent.toFixed(4)),
+        });
+      });
+    });
+
+    return {
+      version: SAVE_VERSION,
+      season: c.season,
+      status: c.status,
+      playerFactionId: c.playerFactionId,
+      selectedStateId: c.selectedStateId,
+      cameraX: camera.x,
+      cameraY: camera.y,
+      cameraScale: camera.scale,
+      allocLevies: c.allocations.levies,
+      allocSiege: c.allocations.siege,
+      allocCivil: c.allocations.civil,
+      queue: c.queue.map((item) => ({ ...item })),
+      chronicle: [...c.chronicle],
+      factions: Object.values(c.factionsById).map((faction) => ({
+        id: faction.id,
+        name: faction.name,
+        color: faction.color,
+        traitId: faction.traitId,
+        traitName: faction.traitName,
+        traitSummary: faction.traitSummary,
+        traitEffect: { ...faction.traitEffect },
+        isPlayer: faction.isPlayer,
+        aggression: faction.aggression,
+        doctrine: faction.doctrine,
+        capitalStateId: faction.capitalStateId,
+        statesOwned: faction.statesOwned,
+        power: faction.power,
+        gold: faction.resources.gold,
+        levies: faction.resources.levies,
+        rations: faction.resources.rations,
+      })),
+      states: Object.values(c.statesById).map((stateRecord) => ({
+        id: stateRecord.id,
+        ownerFactionId: stateRecord.ownerFactionId,
+        levies: stateRecord.levies,
+        supply: stateRecord.supply,
+        prosperity: stateRecord.prosperity,
+        fort: stateRecord.fort,
+        pressure: stateRecord.pressure,
+      })),
+      stateControl,
+    };
+  }
+
+  function deserializeCampaign(raw) {
+    if (!raw || typeof raw !== 'object') return null;
+    const stateRecords = {};
+    mapModel.states.forEach((mapState) => {
+      stateRecords[mapState.id] = {
+        id: mapState.id,
+        abbr: mapState.abbr,
+        name: mapState.name,
+        region: mapState.region,
+        terrain: mapState.terrain,
+        ownerFactionId: 'player',
+        levies: 60,
+        supply: 50,
+        prosperity: 65,
+        fort: 1,
+        pressure: 50,
+        neighbors: [...mapState.neighbors],
+        centroid: [...mapState.centroid],
+        control: { player: 100 },
+        frontline: false,
+      };
+    });
+
+    const factionsById = {};
+    if (!Array.isArray(raw.factions)) return null;
+    raw.factions.forEach((entry) => {
+      if (!entry.id) return;
+      factionsById[entry.id] = {
+        id: entry.id,
+        name: entry.name,
+        color: entry.color,
+        traitId: entry.traitId,
+        traitName: entry.traitName,
+        traitSummary: entry.traitSummary,
+        traitEffect: entry.traitEffect,
+        isPlayer: Boolean(entry.isPlayer),
+        aggression: Number(entry.aggression || 0),
+        doctrine: entry.doctrine || 'fabian',
+        capitalStateId: entry.capitalStateId,
+        statesOwned: Number(entry.statesOwned || 0),
+        power: Number(entry.power || 0),
+        resources: {
+          gold: Number(entry.gold || 0),
+          levies: Number(entry.levies || 0),
+          rations: Number(entry.rations || 0),
+        },
+      };
+    });
+
+    if (!factionsById.player) return null;
+
+    if (Array.isArray(raw.states)) {
+      raw.states.forEach((entry) => {
+        const stateRecord = stateRecords[entry.id];
+        if (!stateRecord) return;
+        stateRecord.ownerFactionId = entry.ownerFactionId || stateRecord.ownerFactionId;
+        stateRecord.levies = Number(entry.levies ?? stateRecord.levies);
+        stateRecord.supply = Number(entry.supply ?? stateRecord.supply);
+        stateRecord.prosperity = Number(entry.prosperity ?? stateRecord.prosperity);
+        stateRecord.fort = Number(entry.fort ?? stateRecord.fort);
+        stateRecord.pressure = Number(entry.pressure ?? stateRecord.pressure);
+        stateRecord.control = { [stateRecord.ownerFactionId]: 100 };
+      });
+    }
+
+    if (Array.isArray(raw.stateControl)) {
+      Object.values(stateRecords).forEach((stateRecord) => {
+        stateRecord.control = {};
+      });
+      raw.stateControl.forEach((entry) => {
+        if (!stateRecords[entry.stateId]) return;
+        const value = Number(entry.percent);
+        if (!Number.isFinite(value)) return;
+        stateRecords[entry.stateId].control[entry.factionId] = value;
+      });
+      Object.values(stateRecords).forEach((stateRecord) => {
+        stateRecord.control = normalizeControl(stateRecord.control, stateRecord.ownerFactionId);
+        stateRecord.ownerFactionId = dominantControl(stateRecord).factionId;
+      });
+    }
+
+    const nextCampaign = {
+      version: SAVE_VERSION,
+      season: Number(raw.season || 1),
+      status: raw.status || 'Live',
+      playerFactionId: raw.playerFactionId || 'player',
+      selectedStateId: raw.selectedStateId || mapModel.states[0].id,
+      allocations: {
+        levies: Number(raw.allocLevies ?? 45),
+        siege: Number(raw.allocSiege ?? 30),
+        civil: Number(raw.allocCivil ?? 25),
+      },
+      queue: Array.isArray(raw.queue) ? raw.queue.map((item) => ({ ...item })) : [],
+      chronicle: Array.isArray(raw.chronicle) ? [...raw.chronicle] : [],
+      factionsById,
+      statesById: stateRecords,
+      vectors: [],
+      camera: {
+        x: Number(raw.cameraX || 0),
+        y: Number(raw.cameraY || 0),
+        scale: Number(raw.cameraScale || 1),
+      },
+    };
+
+    refreshOwnershipAndFrontline(nextCampaign);
+    recalcFactionPower(nextCampaign);
+    return nextCampaign;
+  }
+
+  function persistCampaign() {
+    if (!campaign) return;
+    const serialized = serializeCampaign(campaign);
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(serialized));
+  }
+
+  function restoreCampaign() {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) return null;
+    try {
+      const parsed = JSON.parse(raw);
+      const restored = deserializeCampaign(parsed);
+      return restored;
+    } catch {
+      return null;
+    }
+  }
+
+  async function importCampaignFromFile() {
+    const file = EL.importFile.files?.[0];
+    if (!file) {
+      if (campaign) {
+        campaign.chronicle.unshift(`Season ${campaign.season}: Choose a JSON file before importing.`);
+        renderAll();
+      }
+      return;
+    }
+
+    const text = await file.text();
+    try {
+      const parsed = JSON.parse(text);
+      const restored = deserializeCampaign(parsed);
+      if (!restored) throw new Error('Invalid campaign format.');
+      campaign = restored;
+      camera = { ...campaign.camera };
+      applyCamera();
+      persistCampaign();
+      closeSettings();
+      campaign.chronicle.unshift(`Season ${campaign.season}: Campaign imported from file.`);
+      renderAll();
+    } catch {
+      if (campaign) {
+        campaign.chronicle.unshift(`Season ${campaign.season}: Import failed. File format is invalid.`);
+        renderAll();
+      }
+    }
+  }
+
+  function setTutorialTarget(element) {
+    document.querySelectorAll('.tutorial-target').forEach((node) => node.classList.remove('tutorial-target'));
+    if (element) element.classList.add('tutorial-target');
+  }
+
+  function showTutorialStep(index) {
+    tutorialIndex = clamp(index, 0, tutorialSteps.length - 1);
+    const step = tutorialSteps[tutorialIndex];
+    EL.tutorialText.textContent = step.text;
+    setTutorialTarget(step.target);
+    EL.tutorialBack.classList.toggle('hidden', tutorialIndex === 0);
+    EL.tutorialNext.classList.toggle('hidden', tutorialIndex >= tutorialSteps.length - 1);
+    EL.tutorialClose.classList.toggle('hidden', tutorialIndex < tutorialSteps.length - 1);
+  }
+
+  function openTutorial() {
+    EL.tutorialOverlay.style.display = 'flex';
+    showTutorialStep(0);
+  }
+
+  function closeTutorial() {
+    EL.tutorialOverlay.style.display = 'none';
+    setTutorialTarget(null);
+  }
+
+  function setupEvents() {
+    EL.newCampaign.addEventListener('click', () => {
+      stopAutoAdvance();
+      campaign = initializeCampaign(EL.startState.value);
+      camera = { x: 0, y: 0, scale: 1 };
+      applyCamera();
+      persistCampaign();
+      renderAll();
+    });
+
+    EL.playerDoctrine.addEventListener('change', () => {
+      updatePlayerDoctrine(EL.playerDoctrine.value);
+    });
+
+    [EL.allocLevies, EL.allocSiege, EL.allocCivil].forEach((slider) => {
+      slider.addEventListener('input', () => {
+        applyAllocationInputs();
+      });
+      slider.addEventListener('change', () => {
+        if (!campaign) return;
+        campaign.chronicle.unshift(`Season ${campaign.season}: Royal allocation revised.`);
+        campaign.chronicle = campaign.chronicle.slice(0, 200);
+        renderAll();
+      });
+    });
+
+    EL.sourceState.addEventListener('change', () => {
+      renderTargetOptions(EL.sourceState.value);
+    });
+
+    EL.queueCampaign.addEventListener('click', () => {
+      queueCampaignAction();
+    });
+
+    EL.advanceSeason.addEventListener('click', () => {
+      runSeason();
+    });
+
+    EL.toggleAuto.addEventListener('click', () => {
+      toggleAutoAdvance();
+    });
+
+    EL.theaterPressure.addEventListener('input', () => {
+      if (!campaign || !campaign.selectedStateId) return;
+      const stateRecord = campaign.statesById[campaign.selectedStateId];
+      if (!stateRecord) return;
+      stateRecord.pressure = Number(EL.theaterPressure.value);
+      EL.theaterPressureReadout.textContent = `${Math.round(stateRecord.pressure)}%`;
+    });
+
+    EL.openSettings.addEventListener('click', openSettings);
+    EL.closeSettings.addEventListener('click', closeSettings);
+    EL.exportSave.addEventListener('click', exportCampaign);
+    EL.importSave.addEventListener('click', importCampaignFromFile);
+    EL.wipeSave.addEventListener('click', wipeSave);
+
+    EL.tutorialBack.addEventListener('click', () => showTutorialStep(tutorialIndex - 1));
+    EL.tutorialNext.addEventListener('click', () => showTutorialStep(tutorialIndex + 1));
+    EL.tutorialClose.addEventListener('click', closeTutorial);
+
+    setupPanelToggle(EL.toggleWarRoom, EL.panelWarRoom, 'left');
+    setupPanelToggle(EL.toggleChronicle, EL.panelChronicle, 'right');
+    setupPanelToggle(EL.toggleDeclarations, EL.panelDeclarations, 'bottom');
+    setupPanelToggle(EL.toggleTheater, EL.panelTheater, 'right');
+
+    window.addEventListener('resize', () => {
+      resizeCanvas();
+      renderAttackVectors();
+    });
+  }
+
+  async function initialize() {
+    renderDoctrineOptions();
+    await loadMap();
+    renderMapScaffold();
+    renderStartStateOptions('48');
+    setupPanZoom();
+    setupEvents();
+
+    const restored = restoreCampaign();
+    const hadNoCampaign = !restored;
+    if (restored) {
+      campaign = restored;
+      camera = { ...campaign.camera };
+    } else {
+      campaign = initializeCampaign(EL.startState.value || '48');
+      persistCampaign();
+    }
+
+    applyCamera();
+    renderAll();
+    lucide.createIcons({ attrs: { 'stroke-width': 1.8, width: 15, height: 15 } });
+
+    if (hadNoCampaign) {
+      openTutorial();
+    }
+
+    animationHandle = requestAnimationFrame(animateLayer);
+  }
+
+  initialize();
 })();

@@ -6,21 +6,26 @@ Alaska and Hawaii are intentionally reserved for a later expansion update.
 
 ## Core highlights
 
-- Medieval chronicle aesthetic with a tactical parchment war-room layout.
-- All 48 continental states are active territories with adjacency-accurate campaign routes.
+- Full-screen map-first viewport with floating diegetic HUD ribbons.
+- Real contiguous US state geometry rendered from local TopoJSON (`data/states-10m.json`).
+- Native pan + zoom map navigation (drag to pan, wheel to zoom).
 - Incremental conquest model:
   - each state tracks control percentage by faction
   - campaigns shift control over time rather than instant all-or-nothing captures
 - Frontline and supply-line warfare:
   - disconnected holdings suffer attrition
   - supply pressure directly affects campaign outcomes
+- Animated battle language:
+  - dashed attack vectors for active maneuvers
+  - contested border pulse + ash/smoke particulate overlay
 - Doctrine RPS layer:
   - Fabian Attrition
   - Feigned Retreat
   - Siegeworks
 - Fog-of-war behavior:
   - exact enemy levy counts are visible only on adjacent borders
-- Dynamic AI faction generation with medieval-style names and traits.
+- Dynamic AI faction generation with medieval-style names and faction traits.
+- First-run guided tutorial overlay when no campaign save exists.
 
 ## Campaign loop
 
@@ -33,14 +38,16 @@ Alaska and Hawaii are intentionally reserved for a later expansion update.
 ## Save system
 
 - Auto-save to `localStorage` at the end of every season.
-- Export save to formatted JSON.
+- Export save to structured flat JSON (`factions`, `states`, `stateControl`, `queue`, `chronicle`).
 - Import save from JSON file.
 
 ## Tech stack
 
 - HTML5
-- Tailwind CSS
+- Custom CSS (no UI framework)
 - Vanilla JavaScript (modular architecture)
+- D3 + TopoJSON client for geographic rendering
+- Lucide icons for HUD iconography
 
 ## Run locally
 
@@ -57,5 +64,5 @@ http://127.0.0.1:8100
 ## Repository role
 
 - Portfolio project type: browser simulation game
-- Focus areas: systems design, game-state architecture, AI turn logic, and UI clarity
+- Focus areas: systems design, war simulation loops, map rendering, and interactive UX polish
 
