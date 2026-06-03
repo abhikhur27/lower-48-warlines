@@ -38,6 +38,12 @@ Alaska and Hawaii are intentionally reserved for a later expansion update.
 ## Save system
 
 - Auto-save to `localStorage` at the end of every season.
+
+## Platform honesty
+
+- Project type: Browser strategy game
+- Stack truth: HTML, CSS, JavaScript, local TopoJSON data
+- Positioning: this is a simulation-heavy web game, not a native systems project
 - Export save to structured flat JSON (`factions`, `states`, `stateControl`, `queue`, `chronicle`).
 - Import save from JSON file.
 
