@@ -1,6 +1,6 @@
 # Continental Feuds
 
-**Abhi's State War Simulator** is a browser strategy campaign across all 48 continental US states.
+**Continental Feuds** is a browser strategy campaign across all 48 continental US states.
 
 Alaska and Hawaii are intentionally reserved for a later expansion update.
 
