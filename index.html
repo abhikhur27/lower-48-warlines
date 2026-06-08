@@ -4,579 +4,329 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Abhi's State War Simulator | Continental Feuds</title>
-  <meta name="description" content="Premium map-first historical strategy simulation across the 48 continental states.">
+  <meta name="description" content="Editorial paper-and-ink war simulation across the 48 continental states.">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500;600;700&family=Source+Sans+3:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <style>
-    :root {
-      --paper-a: #ebdcb9;
-      --paper-b: #dfce9f;
-      --ink: #1f1a14;
-      --ink-muted: #4f4131;
-      --edge: #5c4a36;
-      --edge-soft: rgba(92, 74, 54, 0.5);
-      --crimson: #7d2f2f;
-      --panel-bg: rgba(248, 239, 220, 0.95);
-    }
-
-    * {
-      box-sizing: border-box;
-    }
-
-    html,
-    body {
-      width: 100%;
-      height: 100%;
-      margin: 0;
-      overflow: hidden;
-      background: linear-gradient(158deg, var(--paper-a), var(--paper-b));
-      color: var(--ink);
-      font-family: "Source Sans 3", sans-serif;
-    }
-
-    #game-root {
-      position: relative;
-      width: 100vw;
-      height: 100vh;
-      overflow: hidden;
-      user-select: none;
-      cursor: grab;
-    }
-
-    #game-root.dragging {
-      cursor: grabbing;
-    }
-
-    #paper-noise {
-      position: absolute;
-      inset: 0;
-      pointer-events: none;
-      background:
-        radial-gradient(circle at 11% 17%, rgba(255, 255, 255, 0.24) 0 1px, transparent 1px),
-        radial-gradient(circle at 67% 53%, rgba(0, 0, 0, 0.07) 0 1px, transparent 1px),
-        radial-gradient(circle at 36% 86%, rgba(0, 0, 0, 0.05) 0 1px, transparent 1px);
-      background-size: 7px 7px, 11px 11px, 13px 13px;
-      opacity: 0.52;
-      mix-blend-mode: multiply;
-      z-index: 1;
-    }
-
-    #war-map,
-    #ash-canvas {
-      position: absolute;
-      inset: 0;
-      width: 100%;
-      height: 100%;
-    }
-
-    #war-map {
-      z-index: 2;
-    }
-
-    #ash-canvas {
-      z-index: 3;
-      pointer-events: none;
-    }
-
-    .hud-panel {
-      position: absolute;
-      background: var(--panel-bg);
-      border: 3px double var(--edge);
-      box-shadow: 0 8px 24px rgba(27, 20, 10, 0.24);
-      padding: 0.68rem 0.78rem;
-      z-index: 6;
-      color: var(--ink);
-      backdrop-filter: blur(1.6px);
-      transition: transform 220ms ease;
-    }
-
-    .hud-panel h2,
-    .hud-panel h3 {
-      margin: 0;
-      font-family: "Cormorant Garamond", Georgia, serif;
-      letter-spacing: 0.03em;
-      font-weight: 700;
-      color: #2a2016;
-    }
-
-    .hud-panel p {
-      margin: 0;
-    }
-
-    .hud-row {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 0.6rem;
-      font-size: 0.87rem;
-      margin-top: 0.32rem;
-      color: var(--ink-muted);
-    }
-
-    .hud-grid {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 0.35rem 0.6rem;
-      margin-top: 0.5rem;
-    }
-
-    .metric-box {
-      border: 2px solid var(--edge-soft);
-      background: rgba(255, 251, 241, 0.84);
-      padding: 0.35rem 0.45rem;
-      min-height: 58px;
-    }
-
-    .metric-box strong {
-      font-size: 0.93rem;
-      color: #2a2016;
-      display: inline-block;
-      margin-top: 0.12rem;
-    }
-
-    .metric-label {
-      display: flex;
-      align-items: center;
-      gap: 0.32rem;
-      font-size: 0.71rem;
-      letter-spacing: 0.08em;
-      text-transform: uppercase;
-      color: #614d36;
-      font-weight: 700;
-    }
-
-    .hud-select,
-    .hud-button,
-    .hud-range {
-      width: 100%;
-      font: inherit;
-      color: #221a12;
-      background: rgba(255, 251, 242, 0.92);
-      border: 2px solid var(--edge-soft);
-      border-radius: 0;
-      padding: 0.4rem 0.5rem;
-    }
-
-    .hud-button {
-      cursor: pointer;
-      font-weight: 700;
-      letter-spacing: 0.02em;
-      transition: background 140ms ease;
-    }
-
-    .hud-button:hover {
-      background: rgba(243, 232, 203, 0.96);
-    }
-
-    .hud-button.danger {
-      border-color: rgba(120, 35, 35, 0.65);
-      color: #511717;
-      background: rgba(245, 224, 214, 0.9);
-    }
-
-    .hud-block {
-      border-top: 1px solid rgba(92, 74, 54, 0.35);
-      margin-top: 0.58rem;
-      padding-top: 0.58rem;
-    }
-
-    .hud-ribbon {
-      position: absolute;
-      z-index: 7;
-      border: 2px solid var(--edge);
-      border-left: 0;
-      background: rgba(242, 227, 192, 0.96);
-      color: #3b2f21;
-      font-family: "Cormorant Garamond", Georgia, serif;
-      font-size: 1.04rem;
-      letter-spacing: 0.04em;
-      padding: 0.24rem 0.62rem;
-      cursor: pointer;
-    }
-
-    .hud-ribbon.right {
-      border-left: 2px solid var(--edge);
-      border-right: 0;
-    }
-
-    .panel-collapsed.left {
-      transform: translateX(calc(-100% - 8px));
-    }
-
-    .panel-collapsed.right {
-      transform: translateX(calc(100% + 8px));
-    }
-
-    .panel-collapsed.bottom {
-      transform: translateY(calc(100% + 8px));
-    }
-
-    .panel-collapsed.top {
-      transform: translateY(calc(-100% - 8px));
-    }
-
-    #title-plaque {
-      top: 12px;
-      left: 50%;
-      transform: translateX(-50%);
-      text-align: center;
-      padding: 0.4rem 0.9rem 0.3rem;
-      min-width: 360px;
-      pointer-events: none;
-    }
-
-    #title-plaque h1 {
-      font-size: 1.7rem;
-      line-height: 1;
-    }
-
-    #title-plaque p {
-      margin-top: 0.08rem;
-      text-transform: uppercase;
-      letter-spacing: 0.13em;
-      font-size: 0.69rem;
-      color: #5c4a36;
-      font-weight: 700;
-    }
-
-    #hud-war-room {
-      top: 12px;
-      left: 12px;
-      width: 320px;
-      max-height: calc(100vh - 24px);
-      overflow: auto;
-    }
-
-    #hud-chronicle {
-      top: 12px;
-      right: 12px;
-      width: 360px;
-      max-height: calc(100vh - 24px);
-      overflow: auto;
-    }
-
-    #hud-declarations {
-      left: 50%;
-      bottom: 12px;
-      transform: translateX(-50%);
-      width: min(860px, calc(100vw - 120px));
-      max-height: 290px;
-      overflow: auto;
-    }
-
-    #hud-theater {
-      right: 12px;
-      bottom: 12px;
-      width: 340px;
-      max-height: 360px;
-      overflow: auto;
-    }
-
-    #chronicle-log {
-      margin-top: 0.45rem;
-      display: grid;
-      gap: 0.26rem;
-      max-height: 300px;
-      overflow: auto;
-      font-size: 0.83rem;
-      color: #3d3123;
-      line-height: 1.3;
-    }
-
-    .chronicle-item {
-      border-bottom: 1px dotted rgba(92, 74, 54, 0.38);
-      padding-bottom: 0.22rem;
-    }
-
-    #action-queue {
-      margin-top: 0.46rem;
-      border: 2px solid var(--edge-soft);
-      min-height: 54px;
-      padding: 0.34rem 0.42rem;
-      font-size: 0.83rem;
-      background: rgba(255, 249, 235, 0.9);
-    }
-
-    .queue-item {
-      border-bottom: 1px dotted rgba(92, 74, 54, 0.34);
-      padding: 0.1rem 0;
-    }
-
-    .state-shape {
-      stroke: #534432;
-      stroke-width: 1.15;
-      cursor: pointer;
-      transition: filter 140ms ease, stroke-width 140ms ease;
-    }
-
-    .state-shape:hover {
-      filter: brightness(1.08);
-      stroke-width: 1.4;
-    }
-
-    .state-label {
-      font-size: 9px;
-      letter-spacing: 0.03em;
-      text-anchor: middle;
-      fill: #1d1610;
-      pointer-events: none;
-      font-weight: 700;
-    }
-
-    .state-selected {
-      stroke: #1f1a13;
-      stroke-width: 2.1;
-    }
-
-    .state-contested {
-      animation: ink-pulse 2s infinite ease-in-out;
-    }
-
-    @keyframes ink-pulse {
-      0% {
-        stroke: rgba(123, 37, 37, 0.46);
-      }
-      50% {
-        stroke: rgba(136, 28, 28, 0.9);
-      }
-      100% {
-        stroke: rgba(123, 37, 37, 0.46);
-      }
-    }
-
-    .attack-vector {
-      fill: none;
-      stroke: rgba(103, 20, 20, 0.85);
-      stroke-width: 2.1;
-      stroke-dasharray: 8 7;
-      animation: march-dash 0.9s linear infinite;
-      pointer-events: none;
-    }
-
-    @keyframes march-dash {
-      to {
-        stroke-dashoffset: -30;
-      }
-    }
-
-    #tutorial-overlay,
-    #settings-overlay {
-      position: absolute;
-      inset: 0;
-      z-index: 12;
-      background: rgba(22, 16, 10, 0.54);
-      display: none;
-      align-items: center;
-      justify-content: center;
-      padding: 1rem;
-    }
-
-    .modal-card {
-      width: min(760px, calc(100vw - 2rem));
-      border: 3px double var(--edge);
-      background: rgba(248, 239, 220, 0.98);
-      box-shadow: 0 16px 30px rgba(0, 0, 0, 0.25);
-      padding: 0.8rem;
-    }
-
-    .modal-card h2 {
-      margin: 0 0 0.2rem;
-      font-family: "Cormorant Garamond", Georgia, serif;
-      font-size: 1.9rem;
-    }
-
-    .modal-card p {
-      margin: 0;
-      color: #3f3224;
-      line-height: 1.35;
-    }
-
-    .modal-actions {
-      margin-top: 0.7rem;
-      display: flex;
-      justify-content: flex-end;
-      gap: 0.5rem;
-    }
-
-    .tutorial-target {
-      outline: 3px solid rgba(157, 48, 48, 0.84);
-      outline-offset: 2px;
-    }
-
-    .hidden {
-      display: none !important;
-    }
-
-    @media (max-width: 920px) {
-      #hud-war-room,
-      #hud-chronicle,
-      #hud-theater {
-        width: min(88vw, 360px);
-      }
-      #hud-declarations {
-        width: calc(100vw - 24px);
-      }
-      #title-plaque {
-        min-width: 280px;
-      }
-    }
-  </style>
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@600;700&family=Source+Sans+3:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
 </head>
 <body>
-  <div id="game-root">
-    <div id="paper-noise"></div>
-    <svg id="war-map" viewBox="0 0 1200 760" preserveAspectRatio="xMidYMid meet">
-      <defs>
-        <filter id="paper-soften" x="-20%" y="-20%" width="140%" height="140%">
-          <feGaussianBlur stdDeviation="0.2"></feGaussianBlur>
-        </filter>
-      </defs>
-      <g id="camera-group">
-        <g id="state-fill-layer"></g>
-        <g id="state-border-layer"></g>
-        <g id="state-label-layer"></g>
-        <g id="vector-layer"></g>
-      </g>
-    </svg>
-    <canvas id="ash-canvas"></canvas>
-
-    <header id="title-plaque" class="hud-panel">
-      <h1>Abhi's State War Simulator</h1>
-      <p>Continental Feuds</p>
-    </header>
-
-    <section id="hud-war-room" class="hud-panel left">
-      <h2>The War Room</h2>
-      <p style="font-size:0.82rem;color:#5d4a37;">Select your ancestral realm, fund campaigns, and set doctrine each season.</p>
-      <div class="hud-grid">
-        <div class="metric-box">
-          <div class="metric-label"><i data-lucide="swords"></i> Levies</div>
-          <strong id="metric-levies">0</strong>
-        </div>
-        <div class="metric-box">
-          <div class="metric-label"><i data-lucide="archive"></i> Royal Coffers</div>
-          <strong id="metric-gold">0</strong>
-        </div>
-        <div class="metric-box">
-          <div class="metric-label"><i data-lucide="wheat"></i> Rations</div>
-          <strong id="metric-rations">0</strong>
-        </div>
-        <div class="metric-box">
-          <div class="metric-label"><i data-lucide="calendar-clock"></i> Season</div>
+  <div id="app-shell">
+    <header class="ui-panel app-header">
+      <div>
+        <h1>Abhi's State War Simulator</h1>
+        <p class="subtitle">Continental Feuds</p>
+      </div>
+      <div class="header-metrics">
+        <div class="metric-chip">
+          <span>Season</span>
           <strong id="metric-season">1</strong>
         </div>
-      </div>
-      <div class="hud-block">
-        <label style="font-size:0.76rem;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;color:#634f39;">Ancestral Realm</label>
-        <select id="start-state" class="hud-select"></select>
-        <button id="new-campaign" class="hud-button" style="margin-top:0.42rem;">Begin New Chronicle</button>
-      </div>
-      <div class="hud-block">
-        <label style="font-size:0.76rem;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;color:#634f39;display:flex;align-items:center;gap:0.3rem;"><i data-lucide="scroll-text"></i> Doctrine</label>
-        <select id="player-doctrine" class="hud-select"></select>
-        <p id="doctrine-note" style="margin-top:0.32rem;font-size:0.78rem;color:#554330;"></p>
-      </div>
-      <div class="hud-block">
-        <h3 style="font-size:1.3rem;">Royal Allocation</h3>
-        <div class="hud-row">
-          <span>Levies Funding</span>
-          <span id="alloc-levies-readout">45%</span>
+        <div class="metric-chip">
+          <span>Realm</span>
+          <strong id="metric-realm">-</strong>
         </div>
-        <input id="alloc-levies" type="range" min="20" max="70" value="45" class="hud-range">
-        <div class="hud-row">
-          <span>Siegeworks</span>
-          <span id="alloc-siege-readout">30%</span>
+        <div class="metric-chip">
+          <span>Ruler</span>
+          <strong id="metric-ruler">-</strong>
         </div>
-        <input id="alloc-siege" type="range" min="10" max="50" value="30" class="hud-range">
-        <div class="hud-row">
-          <span>Civil Stewardship</span>
-          <span id="alloc-civil-readout">25%</span>
+        <div class="metric-chip">
+          <span>Holdings</span>
+          <strong id="metric-holdings">0 / 48</strong>
         </div>
-        <input id="alloc-civil" type="range" min="10" max="50" value="25" class="hud-range">
+        <div class="metric-chip">
+          <span>Status</span>
+          <strong id="metric-status">Live</strong>
+        </div>
       </div>
-      <div class="hud-block">
-        <button id="open-settings" class="hud-button">Campaign Records</button>
-      </div>
-    </section>
-    <button id="toggle-war-room" class="hud-ribbon" style="top:92px;left:0;">War Room</button>
+    </header>
 
-    <section id="hud-chronicle" class="hud-panel right">
-      <h2>Chronicle of the Realm</h2>
-      <div class="hud-row"><span>Realm</span><strong id="metric-realm">-</strong></div>
-      <div class="hud-row"><span>Holdings</span><strong id="metric-holdings">0 / 48</strong></div>
-      <div class="hud-row"><span>Campaign Status</span><strong id="metric-status">Live</strong></div>
-      <div id="chronicle-log"></div>
-    </section>
-    <button id="toggle-chronicle" class="hud-ribbon right" style="top:92px;right:0;">Chronicle</button>
+    <main class="main-layout">
+      <section class="ui-panel panel-stack" aria-label="War Room">
+        <h2>The War Room</h2>
+        <p id="strategist-quote" class="strategist-quote">“The supreme art of war is to subdue the enemy without fighting.” — Sun Tzu</p>
 
-    <section id="hud-declarations" class="hud-panel bottom">
-      <h2>Seasonal Declarations</h2>
-      <div style="display:grid;grid-template-columns:1fr 1fr 1fr auto auto;gap:0.5rem;margin-top:0.4rem;">
-        <select id="source-state" class="hud-select"></select>
-        <select id="target-state" class="hud-select"></select>
-        <select id="campaign-doctrine" class="hud-select"></select>
-        <button id="queue-campaign" class="hud-button">Queue Maneuver</button>
-        <button id="advance-season" class="hud-button">Advance Season</button>
-      </div>
-      <div style="display:flex;gap:0.5rem;margin-top:0.42rem;">
-        <button id="toggle-auto" class="hud-button">Auto: Off</button>
-      </div>
-      <div id="action-queue">No maneuvers queued.</div>
-    </section>
-    <button id="toggle-declarations" class="hud-ribbon right" style="bottom:14px;right:0;">Declarations</button>
+        <div class="metric-grid">
+          <div class="metric-box">
+            <div class="metric-label"><i data-lucide="swords"></i> Levies</div>
+            <strong id="metric-levies">0</strong>
+          </div>
+          <div class="metric-box">
+            <div class="metric-label"><i data-lucide="archive"></i> Royal Coffers</div>
+            <strong id="metric-gold">0</strong>
+          </div>
+          <div class="metric-box">
+            <div class="metric-label"><i data-lucide="wheat"></i> Rations</div>
+            <strong id="metric-rations">0</strong>
+          </div>
+          <div class="metric-box">
+            <div class="metric-label"><i data-lucide="scroll-text"></i> Doctrine</div>
+            <strong id="doctrine-inline">-</strong>
+          </div>
+        </div>
 
-    <section id="hud-theater" class="hud-panel right">
-      <h2>Theater of War</h2>
-      <div id="theater-title" class="hud-row" style="font-weight:700;color:#2f2418;margin-top:0.35rem;">Select a state from the map.</div>
-      <p id="theater-owner" style="margin-top:0.32rem;font-size:0.85rem;color:#4c3b2a;">Control percentages and supply conditions appear here.</p>
-      <div class="hud-block">
-        <div class="hud-row">
-          <span>Border Pressure</span>
-          <span id="theater-pressure-readout">50%</span>
-        </div>
-        <input id="theater-pressure" type="range" min="0" max="100" value="50" class="hud-range">
-      </div>
-      <div class="hud-block">
-        <div id="theater-control-ledger" style="font-size:0.82rem;line-height:1.35;color:#4b3928;"></div>
-      </div>
-    </section>
-    <button id="toggle-theater" class="hud-ribbon right" style="bottom:196px;right:0;">Theater</button>
+        <div class="block">
+          <label class="field-label" for="ruler-name">Ruler Name</label>
+          <input id="ruler-name" class="paper-input" maxlength="36" placeholder="Abhi the Strategist" data-tip="Displayed as your commander name in the campaign chronicle and save file.">
 
-    <div id="tutorial-overlay">
-      <div class="modal-card">
-        <h2>Welcome, Commander.</h2>
-        <p id="tutorial-text"></p>
-        <div class="modal-actions">
-          <button id="tutorial-back" class="hud-button">Back</button>
-          <button id="tutorial-next" class="hud-button">Next</button>
-          <button id="tutorial-close" class="hud-button hidden">Begin Campaign</button>
+          <label class="field-label" for="start-state">Ancestral Realm</label>
+          <select id="start-state" class="paper-input" data-tip="Your opening state. This determines your starting region, trait pool, and initial front lines."></select>
+          <button id="new-campaign" class="paper-button" data-tip="Start a fresh campaign using the current ruler name and ancestral realm.">Begin New Chronicle</button>
         </div>
-      </div>
-    </div>
 
-    <div id="settings-overlay">
-      <div class="modal-card">
-        <h2>Campaign Records</h2>
-        <p>Season saves are persisted automatically after each turn. Export or import structured JSON below.</p>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.6rem;margin-top:0.65rem;">
-          <button id="export-save" class="hud-button">Export Save</button>
-          <button id="wipe-save" class="hud-button danger">Wipe Save</button>
+        <div class="block">
+          <label class="field-label" for="player-doctrine">Field Doctrine</label>
+          <select id="player-doctrine" class="paper-input" data-tip="Your default doctrine for queued campaigns. Each doctrine modifies attack, defense, siege, and supply efficiency."></select>
+          <p id="doctrine-note" class="support-note"></p>
         </div>
-        <div style="display:grid;grid-template-columns:1fr auto;gap:0.5rem;margin-top:0.6rem;">
-          <input id="import-file" type="file" accept="application/json" class="hud-select">
-          <button id="import-save" class="hud-button">Import Save</button>
+
+        <div class="block">
+          <h3>Royal Allocation</h3>
+          <p class="support-note">All three tracks always total exactly 100%.</p>
+
+          <div class="tactile-row">
+            <span class="tactile-name">Levies Funding</span>
+            <div class="tactile-control">
+              <button id="alloc-levies-dec" class="tactile-btn" type="button" data-tip="Lower levy investment by 10%.">[ - ]</button>
+              <span id="alloc-levies-track" class="tactile-track" aria-hidden="true"></span>
+              <button id="alloc-levies-inc" class="tactile-btn" type="button" data-tip="Raise levy investment by 10%; other allocations adjust down proportionally.">[ + ]</button>
+              <span id="alloc-levies-readout" class="tactile-value">50%</span>
+            </div>
+          </div>
+
+          <div class="tactile-row">
+            <span class="tactile-name">Siegeworks</span>
+            <div class="tactile-control">
+              <button id="alloc-siege-dec" class="tactile-btn" type="button" data-tip="Lower siege investment by 10%.">[ - ]</button>
+              <span id="alloc-siege-track" class="tactile-track" aria-hidden="true"></span>
+              <button id="alloc-siege-inc" class="tactile-btn" type="button" data-tip="Raise siege investment by 10%; other allocations adjust down proportionally.">[ + ]</button>
+              <span id="alloc-siege-readout" class="tactile-value">30%</span>
+            </div>
+          </div>
+
+          <div class="tactile-row">
+            <span class="tactile-name">Civil Stewardship</span>
+            <div class="tactile-control">
+              <button id="alloc-civil-dec" class="tactile-btn" type="button" data-tip="Lower civil investment by 10%.">[ - ]</button>
+              <span id="alloc-civil-track" class="tactile-track" aria-hidden="true"></span>
+              <button id="alloc-civil-inc" class="tactile-btn" type="button" data-tip="Raise civil investment by 10%; other allocations adjust down proportionally.">[ + ]</button>
+              <span id="alloc-civil-readout" class="tactile-value">20%</span>
+            </div>
+          </div>
         </div>
-        <div class="modal-actions">
-          <button id="close-settings" class="hud-button">Close</button>
+
+        <div class="block inline-actions">
+          <button id="open-settings" class="paper-button" data-tip="Open export/import and direct campaign stat editing tools.">Campaign Records</button>
+          <button id="toggle-auto" class="paper-button" data-tip="Auto-resolve seasons every ~1.4 seconds until victory/defeat or manual stop.">Auto: Off</button>
         </div>
+      </section>
+
+      <section id="map-stage" class="ui-panel map-stage" aria-label="Strategic Map Room">
+        <div id="paper-noise"></div>
+        <div id="map-vignette"></div>
+        <svg id="war-map" viewBox="0 0 1200 760" preserveAspectRatio="xMidYMid meet">
+          <defs id="map-defs">
+            <filter id="paper-soften" x="-20%" y="-20%" width="140%" height="140%">
+              <feGaussianBlur stdDeviation="0.2"></feGaussianBlur>
+            </filter>
+            <filter id="front-glow" x="-60%" y="-60%" width="220%" height="220%">
+              <feGaussianBlur stdDeviation="1.5" result="blur"></feGaussianBlur>
+              <feMerge>
+                <feMergeNode in="blur"></feMergeNode>
+                <feMergeNode in="SourceGraphic"></feMergeNode>
+              </feMerge>
+            </filter>
+            <filter id="frontier-shadow" x="-25%" y="-25%" width="150%" height="150%">
+              <feDropShadow dx="0" dy="0.5" stdDeviation="0.8" flood-color="#16100a" flood-opacity="0.55"></feDropShadow>
+            </filter>
+            <filter id="capital-glow" x="-90%" y="-90%" width="280%" height="280%">
+              <feGaussianBlur stdDeviation="1.7" result="cb"></feGaussianBlur>
+              <feMerge>
+                <feMergeNode in="cb"></feMergeNode>
+                <feMergeNode in="SourceGraphic"></feMergeNode>
+              </feMerge>
+            </filter>
+            <radialGradient id="sea-wash" cx="50%" cy="44%" r="75%">
+              <stop offset="0%" stop-color="rgba(244,234,209,0)"></stop>
+              <stop offset="100%" stop-color="rgba(120,98,66,0.16)"></stop>
+            </radialGradient>
+            <marker id="vector-arrow" viewBox="0 0 12 12" refX="9" refY="6" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+              <path d="M1,1 L11,6 L1,11 L4,6 Z" fill="rgba(103,20,20,0.92)"></path>
+            </marker>
+            <marker id="order-arrow" viewBox="0 0 12 12" refX="8.5" refY="6" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+              <path d="M0.5,0.5 L11.5,6 L0.5,11.5 L4,6 Z" fill="#8a1f1f"></path>
+            </marker>
+            <marker id="order-arrow-preview" viewBox="0 0 12 12" refX="8.5" refY="6" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+              <path d="M0.5,0.5 L11.5,6 L0.5,11.5 L4,6 Z" fill="rgba(138,31,31,0.6)"></path>
+            </marker>
+          </defs>
+          <rect id="map-sea" x="0" y="0" width="1200" height="760" fill="url(#sea-wash)" pointer-events="none"></rect>
+          <g id="camera-group">
+            <g id="state-fill-layer"></g>
+            <g id="territory-layer"></g>
+            <g id="state-border-layer"></g>
+            <g id="frontier-layer"></g>
+            <g id="frontline-layer"></g>
+            <g id="vector-layer"></g>
+            <g id="order-layer"></g>
+            <g id="capital-layer"></g>
+            <g id="state-label-layer"></g>
+          </g>
+        </svg>
+        <canvas id="ash-canvas"></canvas>
+
+        <div id="standings-panel" class="map-overlay standings-panel">
+          <div class="standings-head">Realms of the Continent</div>
+          <div id="standings-list" class="standings-list"></div>
+        </div>
+
+        <div class="map-overlay map-legend">
+          <span><i class="legend-swatch legend-front"></i> Contested front</span>
+          <span><i class="legend-swatch legend-frontier"></i> National border</span>
+          <span><i class="legend-swatch legend-capital"></i> Capital seat</span>
+        </div>
+
+        <svg class="map-overlay compass-rose" viewBox="0 0 100 100" aria-hidden="true">
+          <circle cx="50" cy="50" r="46" class="compass-ring"></circle>
+          <circle cx="50" cy="50" r="38" class="compass-ring compass-ring-inner"></circle>
+          <path d="M50,8 L57,50 L50,46 L43,50 Z" class="compass-needle-n"></path>
+          <path d="M50,92 L43,50 L50,54 L57,50 Z" class="compass-needle-s"></path>
+          <path d="M8,50 L50,43 L46,50 L50,57 Z" class="compass-needle-w"></path>
+          <path d="M92,50 L50,57 L54,50 L50,43 Z" class="compass-needle-w"></path>
+          <text x="50" y="20" class="compass-label">N</text>
+        </svg>
+      </section>
+
+      <section class="ui-panel panel-stack" aria-label="Chronicle and Theater">
+        <h2>Chronicle of the Realm</h2>
+        <div id="chronicle-log" class="chronicle-log"></div>
+
+        <div class="block">
+          <h3>War Council</h3>
+          <p id="campaign-objective" class="objective-line">Forge a single banner over all 48 states.</p>
+
+          <ol id="loop-steps" class="loop-steps" aria-label="Conquest loop">
+            <li data-step="1"><span class="loop-num">1</span><span class="loop-text">Choose a frontline to attack <em>from</em></span></li>
+            <li data-step="2"><span class="loop-num">2</span><span class="loop-text">Mark the enemy state to strike</span></li>
+            <li data-step="3"><span class="loop-num">3</span><span class="loop-text">Declare the maneuver</span></li>
+            <li data-step="4"><span class="loop-num">4</span><span class="loop-text">Advance the season — repeat until it flips</span></li>
+          </ol>
+
+          <label class="field-label" for="source-state">1 · Attack From <span class="label-hint">(your frontline)</span></label>
+          <select id="source-state" class="paper-input" data-tip="Pick the controlled border state launching this maneuver. A glowing crest marks it on the map."></select>
+
+          <label class="field-label" for="target-state">2 · Strike At <span class="label-hint">(adjacent enemy)</span></label>
+          <select id="target-state" class="paper-input" data-tip="Pick an adjacent enemy state. A targeting reticle and arrow mark it on the map."></select>
+
+          <label class="field-label" for="campaign-doctrine">Doctrine <span class="label-hint">(how you fight)</span></label>
+          <select id="campaign-doctrine" class="paper-input" data-tip="Doctrine used for the queued maneuver. This can differ from your default field doctrine."></select>
+          <p id="campaign-doctrine-note" class="support-note">Doctrine stats appear here.</p>
+
+          <div class="compact-grid two-col">
+            <button id="queue-campaign" class="paper-button" data-tip="Commit this maneuver. A numbered arrow will mark the attack on the map until the season resolves.">3 · Declare Maneuver</button>
+            <button id="advance-season" class="paper-button" data-tip="Resolve all declared maneuvers, AI actions, economy, and supply attrition.">4 · Advance Season</button>
+          </div>
+
+          <div class="advisor-head"><i data-lucide="scroll"></i> The Strategist's Counsel</div>
+          <div id="conquest-advisor" class="advisor-box">Select a frontline and an adjacent enemy, and the strategist will counsel your move.</div>
+
+          <div class="queue-head">Declared Maneuvers</div>
+          <div id="action-queue" class="queue-box">No maneuvers declared.</div>
+        </div>
+
+        <div class="block">
+          <h3>Theater of War</h3>
+          <div id="theater-title" class="theater-title">Select a state from the map.</div>
+          <p id="theater-owner" class="support-note">Control percentages and supply conditions appear here.</p>
+          <p id="theater-buff" class="support-note">State trait appears here.</p>
+          <div class="tactile-row">
+            <span class="tactile-name">Border Pressure</span>
+            <div class="tactile-control">
+              <button id="theater-pressure-dec" class="tactile-btn" type="button" data-tip="Reduce pressure commitment by 10% for this selected state.">[ - ]</button>
+              <span id="theater-pressure-track" class="tactile-track" aria-hidden="true"></span>
+              <button id="theater-pressure-inc" class="tactile-btn" type="button" data-tip="Increase pressure commitment by 10% for this selected state.">[ + ]</button>
+              <span id="theater-pressure-readout" class="tactile-value">50%</span>
+            </div>
+          </div>
+          <div id="theater-control-ledger" class="ledger-text"></div>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <div id="tutorial-overlay" class="overlay">
+    <article class="tutorial-card" role="dialog" aria-modal="true" aria-labelledby="tutorial-title">
+      <div class="tutorial-step-count" id="tutorial-step-count">1 / 4</div>
+      <h2 id="tutorial-title">Strategic Map Room</h2>
+      <p id="tutorial-text"></p>
+      <div class="tutorial-form">
+        <label class="field-label" for="tutorial-ruler-name">Ruler Name</label>
+        <input id="tutorial-ruler-name" class="paper-input" maxlength="36" placeholder="Abhi the Strategist">
+        <label class="field-label" for="tutorial-start-state">Ancestral Realm</label>
+        <select id="tutorial-start-state" class="paper-input"></select>
       </div>
+      <div class="tutorial-actions">
+        <button id="tutorial-retreat" class="paper-button" type="button">Retreat</button>
+        <button id="tutorial-advance" class="paper-button" type="button">Advance</button>
+        <button id="tutorial-finish" class="paper-button hidden" type="button">Found My Realm</button>
+      </div>
+    </article>
+  </div>
+
+  <div id="settings-overlay" class="overlay">
+    <article class="tutorial-card" role="dialog" aria-modal="true" aria-labelledby="settings-title">
+      <h2 id="settings-title">Campaign Records</h2>
+      <p class="support-note">Season saves persist automatically at turn end.</p>
+      <div class="compact-grid two-col">
+        <button id="export-save" class="paper-button">Export Save</button>
+        <button id="wipe-save" class="paper-button danger">Wipe Save</button>
+      </div>
+      <div class="compact-grid two-col" style="margin-top:0.55rem;">
+        <input id="import-file" type="file" accept="application/json" class="paper-input">
+        <button id="import-save" class="paper-button">Import Save</button>
+      </div>
+
+      <div class="block">
+        <h3>Save Editor</h3>
+        <p class="support-note">Edit core player-facing values directly, then apply.</p>
+        <div class="compact-grid two-col">
+          <label class="field-label" for="editor-season">Season</label>
+          <input id="editor-season" type="number" min="1" class="paper-input">
+          <label class="field-label" for="editor-player-levies">Levies</label>
+          <input id="editor-player-levies" type="number" min="0" class="paper-input">
+          <label class="field-label" for="editor-player-gold">Gold</label>
+          <input id="editor-player-gold" type="number" min="0" class="paper-input">
+          <label class="field-label" for="editor-player-rations">Rations</label>
+          <input id="editor-player-rations" type="number" min="0" class="paper-input">
+          <label class="field-label" for="editor-ruler-name">Ruler Name</label>
+          <input id="editor-ruler-name" maxlength="36" class="paper-input">
+          <label class="field-label" for="editor-player-doctrine">Field Doctrine</label>
+          <select id="editor-player-doctrine" class="paper-input"></select>
+        </div>
+        <button id="apply-save-editor" class="paper-button">Apply Save Edits</button>
+      </div>
+
+      <div class="tutorial-actions">
+        <button id="close-settings" class="paper-button">Close</button>
+      </div>
+    </article>
+  </div>
+
+  <div id="campaign-banner" class="campaign-banner hidden">
+    <div class="banner-inner">
+      <div class="banner-seal" aria-hidden="true"></div>
+      <h2 id="banner-title">Continental Dominion</h2>
+      <p id="banner-text"></p>
+      <button id="banner-dismiss" class="paper-button" type="button">Return to the Map</button>
     </div>
   </div>
+
+  <div id="hover-help" class="hover-help hidden"></div>
 
   <script src="https://cdn.jsdelivr.net/npm/d3@7/dist/d3.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/topojson-client@3/dist/topojson-client.min.js"></script>
   <script src="https://unpkg.com/lucide@latest"></script>
+  <script src="data/states-10m.js"></script>
   <script src="script.js"></script>
 </body>
 </html>

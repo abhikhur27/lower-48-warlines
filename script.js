@@ -2,7 +2,8 @@
   'use strict';
 
   const STORAGE_KEY = 'abhi_state_war_sim_campaign_v3';
-  const SAVE_VERSION = 3;
+  const SAVE_VERSION = 4;
+  const DEFAULT_RULER_NAME = 'Abhi the Strategist';
 
   const CONTIGUOUS_FIPS = new Set([
     '01', '04', '05', '06', '08', '09', '10', '12', '13', '16', '17', '18', '19', '20', '21', '22', '23', '24',
@@ -35,6 +36,7 @@
       defense: 1.17,
       siege: 0.96,
       supply: 1.15,
+      counters: ['encirclement'],
       note: 'Deliberate withdrawals that bleed invaders and preserve supply depth.',
     },
     feigned: {
@@ -44,6 +46,7 @@
       defense: 0.98,
       siege: 0.99,
       supply: 0.98,
+      counters: ['siege', 'march'],
       note: 'Bait-and-counter warfare with sharper offensive swings.',
     },
     siege: {
@@ -53,15 +56,79 @@
       defense: 1.04,
       siege: 1.18,
       supply: 0.94,
+      counters: ['shieldwall'],
       note: 'Engineer-heavy campaigns that accelerate control transfer in hard targets.',
+    },
+    shieldwall: {
+      key: 'shieldwall',
+      label: 'Pike Shieldwall',
+      attack: 0.95,
+      defense: 1.22,
+      siege: 0.9,
+      supply: 1.02,
+      counters: ['feigned'],
+      note: 'Disciplined defensive ranks blunt raids and stabilize contested borders.',
+    },
+    encirclement: {
+      key: 'encirclement',
+      label: 'Encirclement Drive',
+      attack: 1.15,
+      defense: 0.9,
+      siege: 1.05,
+      supply: 0.9,
+      counters: ['march'],
+      note: 'Fast flank pressure that can collapse enemy fronts if supply holds.',
+    },
+    march: {
+      key: 'march',
+      label: 'Scorched March',
+      attack: 1.03,
+      defense: 0.96,
+      siege: 1.08,
+      supply: 1.08,
+      counters: ['fabian'],
+      note: 'Hard campaigning that preserves momentum through harsh logistics.',
     },
   };
 
-  const DOCTRINE_COUNTER = {
-    fabian: 'feigned',
-    feigned: 'siege',
-    siege: 'fabian',
-  };
+  const STATE_BUFF_TEMPLATES = [
+    {
+      key: 'levy',
+      title: 'Drill Muster',
+      statLabel: 'Levy Growth',
+      summary: 'Rural militias answer muster calls faster than average.',
+    },
+    {
+      key: 'gold',
+      title: 'Coin Ledger',
+      statLabel: 'Gold Yield',
+      summary: 'Stable trade taxation improves treasury reliability.',
+    },
+    {
+      key: 'ration',
+      title: 'Granary Ring',
+      statLabel: 'Ration Yield',
+      summary: 'Stored harvest depth supports sustained campaigns.',
+    },
+    {
+      key: 'defense',
+      title: 'Fortified Passes',
+      statLabel: 'Defense',
+      summary: 'Defensive terrain and fort traditions harden resistance.',
+    },
+    {
+      key: 'siege',
+      title: 'Siege Foundries',
+      statLabel: 'Siege Strength',
+      summary: 'Engineering guilds improve artillery and breach tempo.',
+    },
+    {
+      key: 'supply',
+      title: 'Supply Roads',
+      statLabel: 'Supply Efficiency',
+      summary: 'Road and depot networks reduce campaign waste.',
+    },
+  ];
 
   const TRAITS = [
     {
@@ -125,16 +192,18 @@
   };
 
   const FACTION_COLORS = [
-    '#b76a49',
-    '#4f6a45',
-    '#8d4740',
-    '#736145',
-    '#58718a',
-    '#86576f',
-    '#5e5387',
-    '#6e4f2f',
-    '#507165',
+    '#c0673f',
+    '#5a7d4f',
+    '#9c4038',
+    '#c79a3a',
+    '#4d6f8a',
+    '#8a4f6d',
+    '#5f5391',
+    '#7a5230',
+    '#3f8074',
   ];
+
+  const PLAYER_COLOR = '#7c2a24';
 
   const TERRAIN_BY_REGION = {
     West: 'mountain',
@@ -152,24 +221,40 @@
     mountain: { defense: 1.17, supply: 0.88, prosperity: 0.96 },
   };
 
-  const ROOT = document.getElementById('game-root');
+  const MAP_STAGE = document.getElementById('map-stage');
   const SVG = document.getElementById('war-map');
+  const MAP_DEFS = document.getElementById('map-defs');
   const CAMERA_GROUP = document.getElementById('camera-group');
   const FILL_LAYER = document.getElementById('state-fill-layer');
+  const TERRITORY_LAYER = document.getElementById('territory-layer');
+  const FRONTLINE_LAYER = document.getElementById('frontline-layer');
   const BORDER_LAYER = document.getElementById('state-border-layer');
+  const FRONTIER_LAYER = document.getElementById('frontier-layer');
+  const ORDER_LAYER = document.getElementById('order-layer');
+  const CAPITAL_LAYER = document.getElementById('capital-layer');
   const LABEL_LAYER = document.getElementById('state-label-layer');
   const VECTOR_LAYER = document.getElementById('vector-layer');
   const ASH_CANVAS = document.getElementById('ash-canvas');
+  const SVGNS = 'http://www.w3.org/2000/svg';
 
   const EL = {
+    rulerName: document.getElementById('ruler-name'),
     startState: document.getElementById('start-state'),
     newCampaign: document.getElementById('new-campaign'),
     playerDoctrine: document.getElementById('player-doctrine'),
     campaignDoctrine: document.getElementById('campaign-doctrine'),
+    campaignDoctrineNote: document.getElementById('campaign-doctrine-note'),
     doctrineNote: document.getElementById('doctrine-note'),
-    allocLevies: document.getElementById('alloc-levies'),
-    allocSiege: document.getElementById('alloc-siege'),
-    allocCivil: document.getElementById('alloc-civil'),
+    doctrineInline: document.getElementById('doctrine-inline'),
+    allocLeviesDec: document.getElementById('alloc-levies-dec'),
+    allocLeviesInc: document.getElementById('alloc-levies-inc'),
+    allocSiegeDec: document.getElementById('alloc-siege-dec'),
+    allocSiegeInc: document.getElementById('alloc-siege-inc'),
+    allocCivilDec: document.getElementById('alloc-civil-dec'),
+    allocCivilInc: document.getElementById('alloc-civil-inc'),
+    allocLeviesTrack: document.getElementById('alloc-levies-track'),
+    allocSiegeTrack: document.getElementById('alloc-siege-track'),
+    allocCivilTrack: document.getElementById('alloc-civil-track'),
     allocLeviesReadout: document.getElementById('alloc-levies-readout'),
     allocSiegeReadout: document.getElementById('alloc-siege-readout'),
     allocCivilReadout: document.getElementById('alloc-civil-readout'),
@@ -178,6 +263,7 @@
     queueCampaign: document.getElementById('queue-campaign'),
     advanceSeason: document.getElementById('advance-season'),
     toggleAuto: document.getElementById('toggle-auto'),
+    conquestAdvisor: document.getElementById('conquest-advisor'),
     actionQueue: document.getElementById('action-queue'),
     chronicleLog: document.getElementById('chronicle-log'),
     metricLevies: document.getElementById('metric-levies'),
@@ -185,11 +271,15 @@
     metricRations: document.getElementById('metric-rations'),
     metricSeason: document.getElementById('metric-season'),
     metricRealm: document.getElementById('metric-realm'),
+    metricRuler: document.getElementById('metric-ruler'),
     metricHoldings: document.getElementById('metric-holdings'),
     metricStatus: document.getElementById('metric-status'),
     theaterTitle: document.getElementById('theater-title'),
     theaterOwner: document.getElementById('theater-owner'),
-    theaterPressure: document.getElementById('theater-pressure'),
+    theaterBuff: document.getElementById('theater-buff'),
+    theaterPressureDec: document.getElementById('theater-pressure-dec'),
+    theaterPressureInc: document.getElementById('theater-pressure-inc'),
+    theaterPressureTrack: document.getElementById('theater-pressure-track'),
     theaterPressureReadout: document.getElementById('theater-pressure-readout'),
     theaterControlLedger: document.getElementById('theater-control-ledger'),
     openSettings: document.getElementById('open-settings'),
@@ -199,37 +289,65 @@
     importSave: document.getElementById('import-save'),
     importFile: document.getElementById('import-file'),
     wipeSave: document.getElementById('wipe-save'),
+    editorSeason: document.getElementById('editor-season'),
+    editorPlayerLevies: document.getElementById('editor-player-levies'),
+    editorPlayerGold: document.getElementById('editor-player-gold'),
+    editorPlayerRations: document.getElementById('editor-player-rations'),
+    editorRulerName: document.getElementById('editor-ruler-name'),
+    editorPlayerDoctrine: document.getElementById('editor-player-doctrine'),
+    applySaveEditor: document.getElementById('apply-save-editor'),
     tutorialOverlay: document.getElementById('tutorial-overlay'),
+    tutorialStepCount: document.getElementById('tutorial-step-count'),
+    tutorialTitle: document.getElementById('tutorial-title'),
     tutorialText: document.getElementById('tutorial-text'),
-    tutorialBack: document.getElementById('tutorial-back'),
-    tutorialNext: document.getElementById('tutorial-next'),
-    tutorialClose: document.getElementById('tutorial-close'),
-    toggleWarRoom: document.getElementById('toggle-war-room'),
-    toggleChronicle: document.getElementById('toggle-chronicle'),
-    toggleDeclarations: document.getElementById('toggle-declarations'),
-    toggleTheater: document.getElementById('toggle-theater'),
-    panelWarRoom: document.getElementById('hud-war-room'),
-    panelChronicle: document.getElementById('hud-chronicle'),
-    panelDeclarations: document.getElementById('hud-declarations'),
-    panelTheater: document.getElementById('hud-theater'),
+    tutorialRulerName: document.getElementById('tutorial-ruler-name'),
+    tutorialStartState: document.getElementById('tutorial-start-state'),
+    tutorialRetreat: document.getElementById('tutorial-retreat'),
+    tutorialAdvance: document.getElementById('tutorial-advance'),
+    tutorialFinish: document.getElementById('tutorial-finish'),
+    hoverHelp: document.getElementById('hover-help'),
+    standingsList: document.getElementById('standings-list'),
+    strategistQuote: document.getElementById('strategist-quote'),
+    campaignObjective: document.getElementById('campaign-objective'),
+    loopSteps: document.getElementById('loop-steps'),
+    campaignBanner: document.getElementById('campaign-banner'),
+    bannerTitle: document.getElementById('banner-title'),
+    bannerText: document.getElementById('banner-text'),
+    bannerDismiss: document.getElementById('banner-dismiss'),
   };
+
+  // Sun Tzu (Lionel Giles translation, public domain) — rotating war-room counsel.
+  const ART_OF_WAR = [
+    'If you know the enemy and know yourself, you need not fear a hundred battles.',
+    'All warfare is based on deception.',
+    'The supreme art of war is to subdue the enemy without fighting.',
+    'He will win who knows when to fight and when not to fight.',
+    'Attack him where he is unprepared; appear where you are not expected.',
+    'Rapidity is the essence of war.',
+    'In the midst of chaos, there is also opportunity.',
+    'Move not unless you see an advantage; use not your troops unless there is something to be gained.',
+    'The good fighter secures himself against defeat, then awaits his enemy’s undoing.',
+    'Opportunities multiply as they are seized.',
+    'Hold out baits to entice the enemy. Feign disorder, and crush him.',
+    'The skilful leader subdues the enemy’s troops without any fighting.',
+  ];
 
   const tutorialSteps = [
     {
-      text: 'Welcome, Commander. Select your ancestral realm and begin your first campaign.',
-      target: EL.startState,
+      title: 'I. Lay Your Plans',
+      text: '“The art of war is of vital importance to the State.” Name your ruler and choose an ancestral realm. Drag the map to pan, scroll to zoom. Your realm glows; rival banners ring the frontier.',
     },
     {
-      text: 'The War Room controls doctrine and royal allocation. These values alter every seasonal resolution.',
-      target: EL.panelWarRoom,
+      title: 'II. Choose Where to Strike',
+      text: '“Attack him where he is unprepared; appear where you are not expected.” In the War Council: pick a frontline realm to attack FROM, then an adjacent enemy to STRIKE. A reticle and arrow mark your target on the map.',
     },
     {
-      text: 'Seasonal Declarations queue maneuvers. You can stage multiple campaigns before advancing the season.',
-      target: EL.panelDeclarations,
+      title: 'III. Shift the Border',
+      text: '“The clever combatant imposes his will on the enemy.” Declare the maneuver and advance the season. Each season, your colour bleeds across the contested state and the front line physically moves toward the enemy capital.',
     },
     {
-      text: 'The Chronicle records border shifts, attrition, and doctrine outcomes each turn.',
-      target: EL.panelChronicle,
+      title: 'IV. Win the Campaign',
+      text: '“In war, let your great object be victory.” Keep supply lines connected to your capital, hold your levies and rations, and press until states flip. Unite all 48 states to claim continental dominion.',
     },
   ];
 
@@ -252,6 +370,9 @@
   const particles = [];
   let animationHandle = null;
   let lastFrameTime = 0;
+  const TRACK_SEGMENTS = 10;
+  const ALLOCATION_STEP = 10;
+  const PRESSURE_STEP = 10;
 
   function clamp(value, min, max) {
     return Math.max(min, Math.min(max, value));
@@ -284,16 +405,67 @@
     return `${Math.round(value)}%`;
   }
 
+  function sanitizeRulerName(raw) {
+    const normalized = String(raw ?? '').replace(/\s+/g, ' ').trim();
+    return normalized || DEFAULT_RULER_NAME;
+  }
+
+  function signedPercentFromMultiplier(multiplier) {
+    const delta = Math.round((multiplier - 1) * 100);
+    return `${delta >= 0 ? '+' : ''}${delta}%`;
+  }
+
+  function doctrineStatsLine(doctrine) {
+    return [
+      `ATK ${signedPercentFromMultiplier(doctrine.attack)}`,
+      `DEF ${signedPercentFromMultiplier(doctrine.defense)}`,
+      `SIEGE ${signedPercentFromMultiplier(doctrine.siege)}`,
+      `SUPPLY ${signedPercentFromMultiplier(doctrine.supply)}`,
+    ].join(' | ');
+  }
+
+  function doctrineSummary(doctrine) {
+    return `${doctrine.note} ${doctrineStatsLine(doctrine)}.`;
+  }
+
+  function stateBuffForMapState(mapState) {
+    const idSeed = Number(mapState.id);
+    const template = STATE_BUFF_TEMPLATES[idSeed % STATE_BUFF_TEMPLATES.length];
+    const power = 4 + ((idSeed * 7 + mapState.name.length) % 9);
+    const multiplier = 1 + power / 100;
+    const effect = { levy: 1, gold: 1, ration: 1, defense: 1, siege: 1, supply: 1 };
+    effect[template.key] = multiplier;
+    return {
+      key: template.key,
+      name: `${mapState.name} ${template.title}`,
+      valuePct: power,
+      effect,
+      summary: `${template.summary} (+${power}% ${template.statLabel}).`,
+    };
+  }
+
   function doctrineAdvantage(attackerKey, defenderKey) {
     if (attackerKey === defenderKey) return 1;
-    if (DOCTRINE_COUNTER[attackerKey] === defenderKey) return 1.13;
-    if (DOCTRINE_COUNTER[defenderKey] === attackerKey) return 0.89;
+    const attacker = DOCTRINES[attackerKey];
+    const defender = DOCTRINES[defenderKey];
+    if (!attacker || !defender) return 1;
+    if ((attacker.counters || []).includes(defenderKey)) return 1.12;
+    if ((defender.counters || []).includes(attackerKey)) return 0.89;
     return 1;
   }
 
   async function loadMap() {
-    const topo = await d3.json('data/states-10m.json');
+    let topo = window.__US_STATES_TOPOJSON__;
+    if (!topo) {
+      try {
+        topo = await d3.json('data/states-10m.json');
+      } catch (error) {
+        throw new Error('Map data could not be loaded. Ensure data/states-10m.js is present for file:// browser runs.');
+      }
+    }
     const stateObject = topo.objects.states;
+    mapModel.topo = topo;
+    mapModel.statesObject = stateObject;
     const allFeatures = topojson.feature(topo, stateObject).features;
     const geometries = stateObject.geometries;
     const geometryNeighbors = topojson.neighbors(geometries);
@@ -321,15 +493,23 @@
       const id = String(feature.id).padStart(2, '0');
       const abbr = STATE_ABBR_BY_FIPS[id];
       const centroid = mapModel.pathGenerator.centroid(feature);
-      return {
+      const bounds = mapModel.pathGenerator.bounds(feature);
+      const region = REGION_BY_ABBR[abbr] || 'East';
+      const terrain = TERRAIN_BY_REGION[region];
+      const templateState = {
         id,
         abbr,
         name: feature.properties.name,
-        region: REGION_BY_ABBR[abbr] || 'East',
-        terrain: TERRAIN_BY_REGION[REGION_BY_ABBR[abbr] || 'East'],
+        region,
+        terrain,
+      };
+      return {
+        ...templateState,
         neighbors: neighborById[id] || [],
         path: mapModel.pathGenerator(feature),
         centroid,
+        bounds,
+        buff: stateBuffForMapState(templateState),
       };
     });
 
@@ -338,11 +518,12 @@
 
   function renderMapScaffold() {
     const fillFragment = document.createDocumentFragment();
-    const borderFragment = document.createDocumentFragment();
     const labelFragment = document.createDocumentFragment();
+    const clipFragment = document.createDocumentFragment();
 
     mapModel.states.forEach((state) => {
-      const fillPath = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+      const fillPath = document.createElementNS(SVGNS, 'path');
+      fillPath.id = `state-path-${state.id}`;
       fillPath.setAttribute('d', state.path);
       fillPath.setAttribute('data-state-id', state.id);
       fillPath.classList.add('state-shape');
@@ -356,15 +537,16 @@
       });
       fillFragment.append(fillPath);
 
-      const borderPath = document.createElementNS('http://www.w3.org/2000/svg', 'path');
-      borderPath.setAttribute('d', state.path);
-      borderPath.setAttribute('fill', 'none');
-      borderPath.setAttribute('stroke', 'rgba(54,42,28,0.6)');
-      borderPath.setAttribute('stroke-width', '0.9');
-      borderPath.style.pointerEvents = 'none';
-      borderFragment.append(borderPath);
+      const clipPath = document.createElementNS(SVGNS, 'clipPath');
+      clipPath.id = `clip-state-${state.id}`;
+      clipPath.setAttribute('clipPathUnits', 'userSpaceOnUse');
+      clipPath.setAttribute('data-state-clip', 'true');
+      const clipShape = document.createElementNS(SVGNS, 'path');
+      clipShape.setAttribute('d', state.path);
+      clipPath.append(clipShape);
+      clipFragment.append(clipPath);
 
-      const label = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+      const label = document.createElementNS(SVGNS, 'text');
       label.setAttribute('x', String(state.centroid[0]));
       label.setAttribute('y', String(state.centroid[1]));
       label.setAttribute('dy', '0.35em');
@@ -374,8 +556,8 @@
     });
 
     FILL_LAYER.append(fillFragment);
-    BORDER_LAYER.append(borderFragment);
     LABEL_LAYER.append(labelFragment);
+    MAP_DEFS.append(clipFragment);
   }
 
   function stateDistance(fromId, toId) {
@@ -479,16 +661,18 @@
     return fallback;
   }
 
-  function initializeCampaign(startStateId) {
+  function initializeCampaign(startStateId, rulerName = DEFAULT_RULER_NAME) {
     const playerState = mapModel.statesById[startStateId];
     const playerRegion = playerState.region;
     const playerTrait = pickTrait(playerRegion);
+    const cleanRulerName = sanitizeRulerName(rulerName);
 
     const factionById = {
       player: {
         id: 'player',
         name: `${playerState.name} Crown`,
-        color: '#6d3f30',
+        rulerName: cleanRulerName,
+        color: PLAYER_COLOR,
         traitId: playerTrait.id,
         traitName: playerTrait.name,
         traitSummary: playerTrait.summary,
@@ -531,7 +715,7 @@
         traitEffect: trait.effect,
         isPlayer: false,
         aggression: 0.38 + Math.random() * 0.44,
-        doctrine: randomItem(['fabian', 'feigned', 'siege']),
+        doctrine: randomItem(Object.keys(DOCTRINES)),
         capitalStateId,
         statesOwned: 0,
         power: 0,
@@ -559,6 +743,7 @@
         name: mapState.name,
         region: mapState.region,
         terrain: mapState.terrain,
+        buff: mapState.buff ? { ...mapState.buff, effect: { ...mapState.buff.effect } } : null,
         ownerFactionId,
         levies: clamp(Math.round(prosperity * 1.55 + randInt(8, 36)), 40, 300),
         supply: clamp(Math.round(58 * terrainFactor.supply + randInt(-8, 8)), 18, 120),
@@ -567,6 +752,7 @@
         pressure: 50,
         neighbors: [...mapState.neighbors],
         centroid: [...mapState.centroid],
+        bounds: mapState.bounds ? [[...mapState.bounds[0]], [...mapState.bounds[1]]] : [[0, 0], [0, 0]],
         control: { [ownerFactionId]: 100 },
         frontline: false,
       };
@@ -578,9 +764,10 @@
       status: 'Live',
       playerFactionId: 'player',
       selectedStateId: startStateId,
-      allocations: { levies: 45, siege: 30, civil: 25 },
+      rulerName: cleanRulerName,
+      allocations: { levies: 50, siege: 30, civil: 20 },
       queue: [],
-      chronicle: [`Season 1: ${factionById.player.name} claims ${playerState.name} and calls banners to war.`],
+      chronicle: [`Season 1: ${cleanRulerName} of ${factionById.player.name} claims ${playerState.name} and calls banners to war.`],
       factionsById: factionById,
       statesById: stateById,
       vectors: [],
@@ -731,6 +918,12 @@
     return set;
   }
 
+  function averageStateBuffMultiplier(states, key) {
+    if (!states.length) return 1;
+    const sum = states.reduce((acc, stateRecord) => acc + (stateRecord.buff?.effect?.[key] || 1), 0);
+    return sum / states.length;
+  }
+
   function produceEconomy(c) {
     Object.values(c.factionsById).forEach((faction) => {
       if (faction.statesOwned <= 0) return;
@@ -751,14 +944,18 @@
       }
 
       const trait = faction.traitEffect;
+      const buffLevy = averageStateBuffMultiplier(states, 'levy');
+      const buffGold = averageStateBuffMultiplier(states, 'gold');
+      const buffRation = averageStateBuffMultiplier(states, 'ration');
+      const buffSupply = averageStateBuffMultiplier(states, 'supply');
       const civicIndex = states.reduce((sum, stateRecord) => {
         const terrainProsperity = TERRAIN_MODIFIERS[stateRecord.terrain].prosperity;
         return sum + stateRecord.prosperity * terrainProsperity;
       }, 0);
 
-      const levyGain = civicIndex * 0.2 * levyShare * trait.levy;
-      const goldGain = civicIndex * (0.2 + 0.3 * civilShare) * trait.gold;
-      const rationGain = civicIndex * (0.17 + 0.25 * civilShare) * trait.ration;
+      const levyGain = civicIndex * 0.2 * levyShare * trait.levy * buffLevy;
+      const goldGain = civicIndex * (0.2 + 0.3 * civilShare) * trait.gold * buffGold;
+      const rationGain = civicIndex * (0.17 + 0.25 * civilShare) * trait.ration * buffRation;
       faction.resources.levies = clamp(faction.resources.levies + levyGain, 0, 999999);
       faction.resources.gold = clamp(faction.resources.gold + goldGain, 0, 999999);
       faction.resources.rations = clamp(faction.resources.rations + rationGain, 0, 999999);
@@ -768,7 +965,11 @@
 
       states.forEach((stateRecord) => {
         stateRecord.levies = clamp(stateRecord.levies + Math.round(perStateLevies * (0.72 + Math.random() * 0.5)), 8, 460);
-        stateRecord.supply = clamp(stateRecord.supply + Math.round(perStateSupply * (0.84 + Math.random() * 0.45)), 10, 140);
+        stateRecord.supply = clamp(
+          stateRecord.supply + Math.round(perStateSupply * buffSupply * (0.84 + Math.random() * 0.45)),
+          10,
+          140,
+        );
       });
     });
   }
@@ -787,6 +988,11 @@
     const rationPressure = clamp((attackerFaction.resources.rations + source.supply * 2) / Math.max(attackerFaction.statesOwned * 170, 1), 0.56, 1.28);
     const doctrineEdge = doctrineAdvantage(action.doctrineKey, defenderDoctrineKey);
     const terrainDefense = TERRAIN_MODIFIERS[target.terrain].defense;
+    const sourceBuff = source.buff?.effect || {};
+    const targetBuff = target.buff?.effect || {};
+    const attackBuff = sourceBuff.siege || 1;
+    const defenseBuff = targetBuff.defense || 1;
+    const supplyBuff = sourceBuff.supply || 1;
 
     const attackPower = source.levies
       * attackerDoctrine.attack
@@ -794,19 +1000,34 @@
       * attackerDoctrine.supply
       * supplyFactor
       * rationPressure
-      * doctrineEdge;
+      * doctrineEdge
+      * attackBuff
+      * supplyBuff;
 
     const defensePower = target.levies
       * defenderDoctrine.defense
       * defenderFaction.traitEffect.defense
       * terrainDefense
-      * (1 + target.fort * 0.06);
+      * (1 + target.fort * 0.06)
+      * defenseBuff;
 
     return {
       ratio: attackPower / Math.max(defensePower, 1),
       sourceConnected,
       defenderDoctrineKey,
     };
+  }
+
+  function predictControlShift(c, action, estimate) {
+    const source = c.statesById[action.sourceId];
+    const attackerFaction = c.factionsById[action.attackerFactionId];
+    const doctrine = DOCTRINES[action.doctrineKey];
+    if (!source || !attackerFaction || !doctrine || !estimate) return 0;
+    const intensity = clamp(action.intensity ?? source.pressure ?? 50, 0, 100);
+    const intensityFactor = 0.75 + intensity / 100 * 0.5;
+    const shiftBase = (estimate.ratio - 0.86) * 15 * doctrine.siege * attackerFaction.traitEffect.siege * intensityFactor;
+    const disconnectedPenalty = estimate.sourceConnected ? 0 : 3;
+    return Math.round(clamp(shiftBase - disconnectedPenalty, -11, 20));
   }
 
   function queueAttackVector(c, sourceId, targetId, attackerFactionId) {
@@ -865,21 +1086,23 @@
     defenderFaction.resources.levies = clamp(defenderFaction.resources.levies - defenderLoss * 0.33, 0, 999999);
 
     const ownerBefore = target.ownerFactionId;
+    const attackerShareBefore = target.control[action.attackerFactionId] || 0;
     transferControl(target, action.attackerFactionId, controlShift);
     const ownerAfter = target.ownerFactionId;
+    const attackerShareAfter = target.control[action.attackerFactionId] || 0;
 
     queueAttackVector(c, source.id, target.id, action.attackerFactionId);
 
     const attackerVisible = visibilitySetForFog.has(source.id) || visibilitySetForFog.has(target.id);
     if (!attackerVisible && !attackerFaction.isPlayer) {
-      return `Rumors of fierce fighting spread beyond ${target.region}. The map’s ink shifts overnight.`;
+      return `Rumors of fierce fighting spread beyond ${target.region}. The map's ink shifts overnight.`;
     }
 
     if (ownerBefore !== ownerAfter) {
-      return `${attackerFaction.name} captures ${target.name} from ${defenderFaction.name} (${Math.max(controlShift, 1)}% border swing).`;
+      return `${attackerFaction.name} captures ${target.name} from ${defenderFaction.name} (${attackerShareBefore.toFixed(1)}% -> ${attackerShareAfter.toFixed(1)}% control).`;
     }
     if (controlShift > 0) {
-      return `${attackerFaction.name} pushes deeper into ${target.name} (+${controlShift}% control).`;
+      return `${attackerFaction.name} pushes deeper into ${target.name} (${attackerShareBefore.toFixed(1)}% -> ${attackerShareAfter.toFixed(1)}%).`;
     }
     return `${attackerFaction.name} is repelled at ${target.name} after heavy losses.`;
   }
@@ -888,7 +1111,10 @@
     const connected = isSupplyConnected(c, faction.id, sourceState.id);
     if (!connected || faction.resources.rations < faction.statesOwned * 82) return 'fabian';
     if ((targetState.terrain === 'mountain' || targetState.terrain === 'hills') && faction.aggression > 0.55) return 'siege';
+    if (targetState.fort >= 4 && faction.aggression > 0.58) return 'encirclement';
+    if (faction.aggression > 0.72) return 'march';
     if (faction.aggression > 0.65) return 'feigned';
+    if (faction.aggression < 0.46) return 'shieldwall';
     return faction.doctrine;
   }
 
@@ -1027,7 +1253,7 @@
     if (!campaign) return;
     const sourceId = EL.sourceState.value;
     const targetId = EL.targetState.value;
-    const doctrineKey = EL.campaignDoctrine.value;
+    const doctrineKey = DOCTRINES[EL.campaignDoctrine.value] ? EL.campaignDoctrine.value : campaign.factionsById[campaign.playerFactionId].doctrine;
     if (!sourceId || !targetId) return;
     const sourceState = campaign.statesById[sourceId];
     const targetState = campaign.statesById[targetId];
@@ -1063,43 +1289,139 @@
     renderAll();
   }
 
-  function applyAllocationInputs() {
-    if (!campaign) return;
-    let levies = Number(EL.allocLevies.value);
-    let siege = Number(EL.allocSiege.value);
-    let civil = Number(EL.allocCivil.value);
-    const total = levies + siege + civil;
-    if (total !== 100) {
-      civil = clamp(civil + (100 - total), 10, 60);
+  function buildTactileTrack(value) {
+    return clamp(Math.round(value / 10), 0, TRACK_SEGMENTS);
+  }
+
+  function renderTactileTrack(trackElement, value) {
+    if (!trackElement) return;
+    const filled = buildTactileTrack(value);
+    trackElement.innerHTML = '';
+    const fragment = document.createDocumentFragment();
+    for (let index = 0; index < TRACK_SEGMENTS; index += 1) {
+      const segment = document.createElement('span');
+      segment.className = `track-segment${index < filled ? ' filled' : ''}`;
+      fragment.append(segment);
     }
-    campaign.allocations = { levies, siege, civil };
-    EL.allocLevies.value = String(levies);
-    EL.allocSiege.value = String(siege);
-    EL.allocCivil.value = String(civil);
-    renderAllocationReadouts();
+    trackElement.append(fragment);
+  }
+
+  function normalizeAllocationTotal(nextAllocations) {
+    const keys = ['levies', 'siege', 'civil'];
+    let sum = keys.reduce((acc, key) => acc + nextAllocations[key], 0);
+    if (sum === 100) return nextAllocations;
+    let diff = 100 - sum;
+    const priority = ['civil', 'siege', 'levies'];
+    for (const key of priority) {
+      if (diff === 0) break;
+      const roomUp = 100 - nextAllocations[key];
+      const roomDown = nextAllocations[key];
+      if (diff > 0 && roomUp > 0) {
+        const add = Math.min(diff, roomUp);
+        nextAllocations[key] += add;
+        diff -= add;
+      } else if (diff < 0 && roomDown > 0) {
+        const subtract = Math.min(Math.abs(diff), roomDown);
+        nextAllocations[key] -= subtract;
+        diff += subtract;
+      }
+    }
+    return nextAllocations;
+  }
+
+  function splitIntegerProportion(total, keys, weightsByKey) {
+    if (total <= 0) return Object.fromEntries(keys.map((key) => [key, 0]));
+    const weightSum = keys.reduce((acc, key) => acc + weightsByKey[key], 0);
+    const baseWeights = weightSum > 0
+      ? weightsByKey
+      : Object.fromEntries(keys.map((key) => [key, 1]));
+    const baseSum = weightSum > 0 ? weightSum : keys.length;
+
+    const provisional = keys.map((key) => {
+      const raw = total * (baseWeights[key] / baseSum);
+      const floored = Math.floor(raw);
+      return { key, raw, floored, remainder: raw - floored };
+    });
+
+    let used = provisional.reduce((acc, item) => acc + item.floored, 0);
+    let remainderUnits = total - used;
+    provisional.sort((a, b) => b.remainder - a.remainder);
+    for (let i = 0; i < provisional.length && remainderUnits > 0; i += 1) {
+      provisional[i].floored += 1;
+      remainderUnits -= 1;
+    }
+    return Object.fromEntries(provisional.map((item) => [item.key, item.floored]));
+  }
+
+  function applyAllocationDelta(changedKey, delta) {
+    if (!campaign || !delta) return;
+    const keys = ['levies', 'siege', 'civil'];
+    const current = { ...campaign.allocations };
+    const next = { ...campaign.allocations };
+    const newTarget = clamp(current[changedKey] + delta, 0, 100);
+    const actualDelta = newTarget - current[changedKey];
+    if (actualDelta === 0) return;
+
+    const others = keys.filter((key) => key !== changedKey);
+    next[changedKey] = newTarget;
+
+    if (actualDelta > 0) {
+      const deduction = splitIntegerProportion(actualDelta, others, current);
+      others.forEach((key) => {
+        next[key] = clamp(current[key] - deduction[key], 0, 100);
+      });
+    } else {
+      const addition = splitIntegerProportion(Math.abs(actualDelta), others, current);
+      others.forEach((key) => {
+        next[key] = clamp(current[key] + addition[key], 0, 100);
+      });
+    }
+
+    campaign.allocations = normalizeAllocationTotal(next);
+    campaign.chronicle.unshift(`Season ${campaign.season}: Royal allocation revised.`);
+    campaign.chronicle = campaign.chronicle.slice(0, 200);
+    renderAll();
   }
 
   function renderAllocationReadouts() {
-    EL.allocLeviesReadout.textContent = toFixedPercent(Number(EL.allocLevies.value));
-    EL.allocSiegeReadout.textContent = toFixedPercent(Number(EL.allocSiege.value));
-    EL.allocCivilReadout.textContent = toFixedPercent(Number(EL.allocCivil.value));
+    if (!campaign) return;
+    EL.allocLeviesReadout.textContent = toFixedPercent(campaign.allocations.levies);
+    EL.allocSiegeReadout.textContent = toFixedPercent(campaign.allocations.siege);
+    EL.allocCivilReadout.textContent = toFixedPercent(campaign.allocations.civil);
+    renderTactileTrack(EL.allocLeviesTrack, campaign.allocations.levies);
+    renderTactileTrack(EL.allocSiegeTrack, campaign.allocations.siege);
+    renderTactileTrack(EL.allocCivilTrack, campaign.allocations.civil);
   }
 
   function renderDoctrineOptions() {
     const options = Object.values(DOCTRINES)
-      .map((doctrine) => `<option value="${doctrine.key}">${doctrine.label}</option>`)
+      .map((doctrine) => {
+        const shortStats = `ATK ${signedPercentFromMultiplier(doctrine.attack)}, DEF ${signedPercentFromMultiplier(doctrine.defense)}, SIEGE ${signedPercentFromMultiplier(doctrine.siege)}, SUPPLY ${signedPercentFromMultiplier(doctrine.supply)}`;
+        return `<option value="${doctrine.key}">${doctrine.label} (${shortStats})</option>`;
+      })
       .join('');
     EL.playerDoctrine.innerHTML = options;
     EL.campaignDoctrine.innerHTML = options;
+    EL.editorPlayerDoctrine.innerHTML = options;
+  }
+
+  function renderDoctrineNotes() {
+    const playerDoctrine = DOCTRINES[EL.playerDoctrine.value];
+    const campaignDoctrine = DOCTRINES[EL.campaignDoctrine.value];
+    if (playerDoctrine) EL.doctrineNote.textContent = doctrineSummary(playerDoctrine);
+    if (campaignDoctrine) EL.campaignDoctrineNote.textContent = doctrineSummary(campaignDoctrine);
   }
 
   function renderStartStateOptions(defaultStateId = '48') {
-    EL.startState.innerHTML = mapModel.states
+    const optionsHtml = mapModel.states
       .slice()
       .sort((a, b) => a.name.localeCompare(b.name))
       .map((state) => `<option value="${state.id}">${state.name} (${state.abbr})</option>`)
       .join('');
+    EL.startState.innerHTML = optionsHtml;
+    EL.tutorialStartState.innerHTML = optionsHtml;
     EL.startState.value = defaultStateId;
+    EL.tutorialStartState.value = defaultStateId;
   }
 
   function renderSourceTargetOptions() {
@@ -1138,6 +1460,10 @@
       return;
     }
 
+    const doctrineKey = DOCTRINES[EL.campaignDoctrine.value]
+      ? EL.campaignDoctrine.value
+      : campaign.factionsById[campaign.playerFactionId].doctrine;
+
     const targets = sourceState.neighbors
       .map((neighborId) => campaign.statesById[neighborId])
       .filter((stateRecord) => stateRecord.ownerFactionId !== campaign.playerFactionId)
@@ -1150,13 +1476,22 @@
 
     targets.forEach((targetState) => {
       const dominant = dominantControl(targetState);
+      const actionPreview = {
+        attackerFactionId: campaign.playerFactionId,
+        sourceId: sourceState.id,
+        targetId: targetState.id,
+        doctrineKey,
+        intensity: sourceState.pressure ?? 50,
+      };
+      const estimate = estimateCampaign(campaign, actionPreview);
+      const predicted = predictControlShift(campaign, actionPreview, estimate);
+      const predictedText = predicted >= 0 ? `+${predicted}` : String(predicted);
       const option = document.createElement('option');
       option.value = targetState.id;
-      option.textContent = `${targetState.name} (${targetState.abbr}) · ${Math.round(dominant.share)}% ${campaign.factionsById[dominant.factionId].name}`;
+      option.textContent = `${targetState.name} (${targetState.abbr}) | Hold ${Math.round(dominant.share)}% ${campaign.factionsById[dominant.factionId].name} | Forecast ${predictedText}%`;
       EL.targetState.append(option);
     });
   }
-
   function chronicleListHtml() {
     return campaign.chronicle
       .slice(0, 36)
@@ -1170,16 +1505,240 @@
 
   function renderQueue() {
     if (!campaign.queue.length) {
-      EL.actionQueue.textContent = 'No maneuvers queued.';
+      EL.actionQueue.textContent = 'No maneuvers declared. Use the War Council above to plan an attack.';
       return;
     }
     EL.actionQueue.innerHTML = campaign.queue
       .map((action, index) => {
         const sourceState = campaign.statesById[action.sourceId];
         const targetState = campaign.statesById[action.targetId];
-        return `<div class="queue-item">${index + 1}. ${sourceState.abbr} -> ${targetState.abbr} · ${DOCTRINES[action.doctrineKey].label} · Pressure ${action.intensity}%</div>`;
+        return `<div class="queue-item">${index + 1}. ${sourceState.abbr} -> ${targetState.abbr} | ${DOCTRINES[action.doctrineKey].label} | Pressure ${action.intensity}%</div>`;
       })
       .join('');
+  }
+
+  function counselBox(quote, advice, readout) {
+    return `<span class="advisor-quote">“${quote}”</span>`
+      + `<span class="advisor-advice">${advice}</span>`
+      + (readout ? `<span class="advisor-readout">${readout}</span>` : '');
+  }
+
+  function renderConquestAdvisor() {
+    if (!campaign || !EL.conquestAdvisor) return;
+    const sourceId = EL.sourceState.value;
+    const targetId = EL.targetState.value;
+    const sourceState = campaign.statesById[sourceId];
+    const targetState = campaign.statesById[targetId];
+    const playerFaction = campaign.factionsById[campaign.playerFactionId];
+
+    if (!sourceState || !targetState) {
+      EL.conquestAdvisor.innerHTML = counselBox(
+        'Know the enemy and know yourself.',
+        'Pick a frontline realm to attack <em>from</em> (step 1), then an adjacent enemy to strike (step 2). I will weigh the odds for you.',
+      );
+      return;
+    }
+
+    if (!sourceState.neighbors.includes(targetState.id)) {
+      EL.conquestAdvisor.innerHTML = counselBox(
+        'He who knows the direct and the indirect approach will be victorious.',
+        `${targetState.name} does not border ${sourceState.name}. You cannot strike where your host cannot march — choose an adjacent enemy.`,
+      );
+      return;
+    }
+
+    const doctrineKey = DOCTRINES[EL.campaignDoctrine.value]
+      ? EL.campaignDoctrine.value
+      : playerFaction.doctrine;
+
+    const actionPreview = {
+      attackerFactionId: campaign.playerFactionId,
+      sourceId: sourceState.id,
+      targetId: targetState.id,
+      doctrineKey,
+      intensity: sourceState.pressure ?? 50,
+    };
+    const estimate = estimateCampaign(campaign, actionPreview);
+    const predictedShift = predictControlShift(campaign, actionPreview, estimate);
+    const predictedText = predictedShift >= 0 ? `+${predictedShift}%` : `${predictedShift}%`;
+
+    const playerShare = targetState.control[campaign.playerFactionId] || 0;
+    const dominant = dominantControl(targetState);
+    const deltaToFlip = dominant.factionId === campaign.playerFactionId
+      ? 0
+      : Math.max(1, Math.ceil(dominant.share - playerShare + 1));
+    const projectedTurns = predictedShift > 0 ? Math.ceil(deltaToFlip / predictedShift) : null;
+
+    const oddsLabel = estimate.ratio >= 1.2 ? 'momentum is yours' : estimate.ratio >= 0.95 ? 'the contest is even' : 'the odds are against you';
+
+    let quote;
+    let advice;
+    if (!estimate.sourceConnected) {
+      quote = 'The line between disorder and order lies in logistics.';
+      advice = `Your host at <strong>${sourceState.abbr}</strong> is cut off from the capital. Reconnect the supply line or expect attrition to bleed this attack.`;
+    } else if (predictedShift <= 0) {
+      quote = 'He will win who knows when to fight and when not to fight.';
+      advice = `<strong>${sourceState.abbr} → ${targetState.abbr}</strong> stalls (${oddsLabel}). Raise Border Pressure, switch doctrine, or strike a weaker neighbour.`;
+    } else if (estimate.ratio >= 1.2) {
+      quote = 'Attack him where he is unprepared; appear where you are not expected.';
+      advice = `<strong>${sourceState.abbr} → ${targetState.abbr}</strong> favours you — declare the maneuver and press hard${projectedTurns ? `; about ${projectedTurns} season${projectedTurns > 1 ? 's' : ''} to flip` : ''}.`;
+    } else {
+      quote = 'Ponder and deliberate before you make a move.';
+      advice = `<strong>${sourceState.abbr} → ${targetState.abbr}</strong> is winnable but ${oddsLabel}${projectedTurns ? `; ~${projectedTurns} season${projectedTurns > 1 ? 's' : ''} to flip` : ''}. Commit only if you can bear the losses.`;
+    }
+
+    const readout = `Forecast ${predictedText}/season · Your hold ${playerShare.toFixed(0)}% vs ${dominant.share.toFixed(0)}% (${campaign.factionsById[dominant.factionId].name}) · Supply ${estimate.sourceConnected ? 'connected' : 'CUT'} · ${DOCTRINES[doctrineKey].label}`;
+
+    EL.conquestAdvisor.innerHTML = counselBox(quote, advice, readout);
+  }
+
+  function renderStrategistQuote() {
+    if (!campaign || !EL.strategistQuote) return;
+    const quote = ART_OF_WAR[campaign.season % ART_OF_WAR.length];
+    EL.strategistQuote.textContent = `“${quote}” — Sun Tzu`;
+  }
+
+  function renderObjective() {
+    if (!campaign || !EL.campaignObjective) return;
+    const held = campaign.factionsById[campaign.playerFactionId]?.statesOwned || 0;
+    EL.campaignObjective.innerHTML = `<strong>Objective:</strong> forge a single banner over all 48 states. You hold <strong>${held} / 48</strong>.`;
+  }
+
+  // Highlight the current step of the conquest loop in the War Council tracker.
+  function renderLoopSteps() {
+    if (!campaign || !EL.loopSteps) return;
+    const sourceState = campaign.statesById[EL.sourceState.value];
+    const targetState = campaign.statesById[EL.targetState.value];
+    const hasSource = Boolean(sourceState && sourceState.ownerFactionId === campaign.playerFactionId && sourceState.frontline);
+    const hasTarget = Boolean(
+      hasSource && targetState && targetState.ownerFactionId !== campaign.playerFactionId
+      && sourceState.neighbors.includes(targetState.id),
+    );
+    const hasQueue = campaign.queue.length > 0;
+
+    let active;
+    if (!hasSource) active = 1;
+    else if (!hasTarget) active = 2;
+    else if (!hasQueue) active = 3;
+    else active = 4;
+
+    EL.loopSteps.querySelectorAll('li').forEach((li) => {
+      const step = Number(li.getAttribute('data-step'));
+      li.classList.toggle('is-active', step === active);
+      li.classList.toggle('is-done', step < active);
+    });
+  }
+
+  // ---- Active-attack markers: arrows + target reticles on the map ----------
+  function buildReticle(x, y, isPreview) {
+    const group = document.createElementNS(SVGNS, 'g');
+    group.classList.add('target-reticle');
+    if (isPreview) group.classList.add('is-preview');
+    group.setAttribute('transform', `translate(${x} ${y})`);
+
+    const ring = document.createElementNS(SVGNS, 'circle');
+    ring.classList.add('reticle-ring');
+    ring.setAttribute('r', '10');
+    const inner = document.createElementNS(SVGNS, 'circle');
+    inner.classList.add('reticle-ring-inner');
+    inner.setAttribute('r', '4.4');
+    group.append(ring, inner);
+
+    [[0, -13, 0, -6.5], [0, 13, 0, 6.5], [-13, 0, -6.5, 0], [13, 0, 6.5, 0]].forEach(([x1, y1, x2, y2]) => {
+      const tick = document.createElementNS(SVGNS, 'line');
+      tick.classList.add('reticle-tick');
+      tick.setAttribute('x1', String(x1));
+      tick.setAttribute('y1', String(y1));
+      tick.setAttribute('x2', String(x2));
+      tick.setAttribute('y2', String(y2));
+      group.append(tick);
+    });
+
+    if (!isPreview) {
+      const pulse = document.createElementNS(SVGNS, 'circle');
+      pulse.classList.add('reticle-pulse');
+      pulse.setAttribute('r', '10');
+      group.append(pulse);
+    }
+    return group;
+  }
+
+  function drawOrder(fragment, sourceId, targetId, number, isPreview) {
+    const source = campaign.statesById[sourceId];
+    const target = campaign.statesById[targetId];
+    if (!source || !target) return;
+    const [fx, fy] = source.centroid;
+    const [tx, ty] = target.centroid;
+    const dx = tx - fx;
+    const dy = ty - fy;
+    const length = Math.hypot(dx, dy) || 1;
+    const bow = Math.min(length * 0.16, 24);
+    const ctrlX = (fx + tx) / 2 + (-dy / length) * bow;
+    const ctrlY = (fy + ty) / 2 + (dx / length) * bow;
+    const d = `M${fx.toFixed(1)},${fy.toFixed(1)} Q${ctrlX.toFixed(1)},${ctrlY.toFixed(1)} ${tx.toFixed(1)},${ty.toFixed(1)}`;
+
+    if (!isPreview) {
+      const glow = document.createElementNS(SVGNS, 'path');
+      glow.classList.add('order-vector-glow');
+      glow.setAttribute('d', d);
+      fragment.append(glow);
+    }
+    const path = document.createElementNS(SVGNS, 'path');
+    path.classList.add(isPreview ? 'order-vector-preview' : 'order-vector');
+    path.setAttribute('d', d);
+    path.setAttribute('marker-end', isPreview ? 'url(#order-arrow-preview)' : 'url(#order-arrow)');
+    fragment.append(path);
+
+    fragment.append(buildReticle(tx, ty, isPreview));
+
+    if (number != null) {
+      const badge = document.createElementNS(SVGNS, 'g');
+      badge.setAttribute('transform', `translate(${(tx + 14).toFixed(1)} ${(ty - 13).toFixed(1)})`);
+      const bg = document.createElementNS(SVGNS, 'circle');
+      bg.classList.add('order-badge-bg');
+      bg.setAttribute('r', '7');
+      const text = document.createElementNS(SVGNS, 'text');
+      text.classList.add('order-badge-text');
+      text.setAttribute('dy', '3.1');
+      text.textContent = String(number);
+      badge.append(bg, text);
+      fragment.append(badge);
+    }
+
+    // Emphasise the source/target state outlines.
+    const sourceEl = document.getElementById(`state-path-${sourceId}`);
+    const targetEl = document.getElementById(`state-path-${targetId}`);
+    if (sourceEl) sourceEl.classList.add(isPreview ? 'state-source-preview' : 'state-source');
+    if (targetEl) targetEl.classList.add(isPreview ? 'state-target-preview' : 'state-target');
+  }
+
+  function renderOrders() {
+    if (!campaign || !ORDER_LAYER) return;
+    ORDER_LAYER.innerHTML = '';
+    FILL_LAYER.querySelectorAll('.state-source, .state-target, .state-source-preview, .state-target-preview')
+      .forEach((el) => el.classList.remove('state-source', 'state-target', 'state-source-preview', 'state-target-preview'));
+
+    const fragment = document.createDocumentFragment();
+    const queuedKeys = new Set();
+    campaign.queue.forEach((action, index) => {
+      queuedKeys.add(`${action.sourceId}:${action.targetId}`);
+      drawOrder(fragment, action.sourceId, action.targetId, index + 1, false);
+    });
+
+    // Live preview of the maneuver currently being composed in the dropdowns.
+    const previewSource = campaign.statesById[EL.sourceState.value];
+    const previewTarget = campaign.statesById[EL.targetState.value];
+    if (
+      previewSource && previewTarget
+      && previewSource.ownerFactionId === campaign.playerFactionId
+      && previewTarget.ownerFactionId !== campaign.playerFactionId
+      && previewSource.neighbors.includes(previewTarget.id)
+      && !queuedKeys.has(`${previewSource.id}:${previewTarget.id}`)
+    ) {
+      drawOrder(fragment, previewSource.id, previewTarget.id, null, true);
+    }
+
+    ORDER_LAYER.append(fragment);
   }
 
   function visibilityForPlayer() {
@@ -1190,8 +1749,9 @@
     if (!campaign || !campaign.selectedStateId || !campaign.statesById[campaign.selectedStateId]) {
       EL.theaterTitle.textContent = 'Select a state from the map.';
       EL.theaterOwner.textContent = 'Control percentages and supply conditions appear here.';
+      EL.theaterBuff.textContent = 'State trait appears here.';
       EL.theaterControlLedger.innerHTML = '';
-      EL.theaterPressure.value = '50';
+      renderTactileTrack(EL.theaterPressureTrack, 50);
       EL.theaterPressureReadout.textContent = '50%';
       return;
     }
@@ -1201,14 +1761,23 @@
     const visible = visibilityForPlayer().has(stateRecord.id) || stateRecord.ownerFactionId === campaign.playerFactionId;
     const connected = isSupplyConnected(campaign, stateRecord.ownerFactionId, stateRecord.id);
     const dominant = dominantControl(stateRecord);
+    const playerShare = stateRecord.control[campaign.playerFactionId] || 0;
+    const controlToFlip = dominant.factionId === campaign.playerFactionId
+      ? 0
+      : Math.max(1, Math.ceil(dominant.share - playerShare + 1));
 
     EL.theaterTitle.textContent = `${stateRecord.name} (${stateRecord.abbr})`;
     EL.theaterOwner.textContent = [
       `Liege: ${owner.name}`,
-      visible ? `Levies ${Math.round(stateRecord.levies)} · Supply ${Math.round(stateRecord.supply)} · Fort ${stateRecord.fort}` : 'Enemy levy totals obscured by fog of war.',
+      visible ? `Levies ${Math.round(stateRecord.levies)} | Supply ${Math.round(stateRecord.supply)} | Fort ${stateRecord.fort}` : 'Enemy levy totals obscured by fog of war.',
       `Dominant control: ${Math.round(dominant.share)}%`,
+      `Your control: ${playerShare.toFixed(1)}%`,
+      dominant.factionId === campaign.playerFactionId ? 'State secured by your crown.' : `Approx ${controlToFlip}% more control needed to flip ownership.`,
       `Supply line: ${connected ? 'Connected' : 'Cut'}`,
     ].join(' | ');
+    EL.theaterBuff.textContent = stateRecord.buff
+      ? `State Trait: ${stateRecord.buff.name} - ${stateRecord.buff.summary}`
+      : 'State trait appears here.';
 
     const controlRows = Object.entries(stateRecord.control)
       .sort((a, b) => b[1] - a[1])
@@ -1218,38 +1787,331 @@
     EL.theaterControlLedger.innerHTML = controlRows;
 
     stateRecord.pressure = clamp(stateRecord.pressure ?? 50, 0, 100);
-    EL.theaterPressure.value = String(stateRecord.pressure);
+    renderTactileTrack(EL.theaterPressureTrack, stateRecord.pressure);
     EL.theaterPressureReadout.textContent = `${Math.round(stateRecord.pressure)}%`;
   }
 
-  function blendHex(hex, amount) {
-    const normalized = hex.replace('#', '');
-    const r = parseInt(normalized.substring(0, 2), 16);
-    const g = parseInt(normalized.substring(2, 4), 16);
-    const b = parseInt(normalized.substring(4, 6), 16);
-    const clampColor = (value) => clamp(Math.round(value), 0, 255);
-    const blended = [
-      clampColor(r + (255 - r) * amount),
-      clampColor(g + (255 - g) * amount),
-      clampColor(b + (255 - b) * amount),
-    ];
-    return `rgb(${blended[0]}, ${blended[1]}, ${blended[2]})`;
+  function adjustSelectedStatePressure(delta) {
+    if (!campaign || !campaign.selectedStateId || !delta) return;
+    const stateRecord = campaign.statesById[campaign.selectedStateId];
+    if (!stateRecord) return;
+    stateRecord.pressure = clamp((stateRecord.pressure ?? 50) + delta, 0, 100);
+    renderTactileTrack(EL.theaterPressureTrack, stateRecord.pressure);
+    EL.theaterPressureReadout.textContent = `${Math.round(stateRecord.pressure)}%`;
+    if (EL.sourceState.value === stateRecord.id) {
+      renderTargetOptions(stateRecord.id);
+      renderConquestAdvisor();
+    }
   }
 
-  function renderMapStateStyles() {
+  function topTwoControllers(stateRecord) {
+    return Object.entries(stateRecord.control)
+      .filter(([factionId, share]) => campaign.factionsById[factionId] && share > 0.05)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 2)
+      .map(([factionId, share]) => ({ factionId, share }));
+  }
+
+  // ---- Shifting-border system --------------------------------------------
+  // Each contested state keeps a persistent overlay (the advancing faction's
+  // colour) and a war-front line. Both ride a transform that slides across the
+  // state as control shifts, so the border physically moves rather than the
+  // fill simply recolouring. The slide is eased every animation frame.
+  const borderFx = new Map();
+
+  function hashString(seed) {
+    let hash = 0;
+    for (let i = 0; i < seed.length; i += 1) {
+      hash = ((hash << 5) - hash + seed.charCodeAt(i)) | 0;
+    }
+    return Math.abs(hash);
+  }
+
+  function frontGeometryFor(stateRecord, idA, idB) {
+    const pair = [idA, idB].sort();
+    const bounds = stateRecord.bounds || mapModel.statesById[stateRecord.id]?.bounds || [[0, 0], [1, 1]];
+    const minX = bounds[0][0];
+    const minY = bounds[0][1];
+    const maxX = bounds[1][0];
+    const maxY = bounds[1][1];
+    const cx = (minX + maxX) / 2;
+    const cy = (minY + maxY) / 2;
+    const w = Math.max(maxX - minX, 1);
+    const h = Math.max(maxY - minY, 1);
+    const R = Math.max(w, h) * 0.78 + 8;
+    const seed = hashString(`${stateRecord.id}:${pair[0]}:${pair[1]}`);
+    const angleDeg = (seed % 130) + 25; // 25..155deg front orientation
+    return { refId: pair[0], otherId: pair[1], cx, cy, R, angleDeg, seed };
+  }
+
+  // A vertical-ish hand-drawn front in slide-local coordinates (x ~ 0).
+  // Returns the front-line stroke path AND a filled overlay path whose left
+  // edge is the same jagged line, so the colour boundary itself is organic.
+  function buildFrontPaths(R, seed) {
+    const steps = 16;
+    const top = -R * 1.5;
+    const bottom = R * 1.5;
+    let state = seed || 1;
+    const rnd = () => {
+      state = (state * 1103515245 + 12345) & 0x7fffffff;
+      return state / 0x7fffffff;
+    };
+    const amp = Math.min(R * 0.13, 6);
+    const far = R * 3;
+    const points = [];
+    for (let i = 0; i <= steps; i += 1) {
+      const t = i / steps;
+      const y = top + (bottom - top) * t;
+      const jag = (rnd() - 0.5) * 2 * amp;
+      points.push([jag, y]);
+    }
+    const frontD = points
+      .map(([x, y], i) => `${i === 0 ? 'M' : 'L'}${x.toFixed(1)},${y.toFixed(1)}`)
+      .join(' ');
+    const overlayD = `${frontD} L${far.toFixed(1)},${bottom.toFixed(1)} L${far.toFixed(1)},${top.toFixed(1)} Z`;
+    return { frontD, overlayD };
+  }
+
+  function ensureBorderFx(stateRecord, idA, idB) {
+    const geo = frontGeometryFor(stateRecord, idA, idB);
+    const pairKey = `${geo.refId}|${geo.otherId}`;
+    let fx = borderFx.get(stateRecord.id);
+
+    if (fx && fx.pairKey !== pairKey) {
+      fx.overlayGroup.remove();
+      fx.frontGroup.remove();
+      fx = null;
+    }
+
+    if (!fx) {
+      const { frontD, overlayD } = buildFrontPaths(geo.R, geo.seed);
+
+      const overlayGroup = document.createElementNS(SVGNS, 'g');
+      overlayGroup.setAttribute('clip-path', `url(#clip-state-${stateRecord.id})`);
+      const overlaySlide = document.createElementNS(SVGNS, 'g');
+      const overlay = document.createElementNS(SVGNS, 'path');
+      overlay.classList.add('territory-overlay');
+      overlay.setAttribute('d', overlayD);
+      overlaySlide.append(overlay);
+      overlayGroup.append(overlaySlide);
+      TERRITORY_LAYER.append(overlayGroup);
+
+      const frontGroup = document.createElementNS(SVGNS, 'g');
+      frontGroup.setAttribute('clip-path', `url(#clip-state-${stateRecord.id})`);
+      const frontSlide = document.createElementNS(SVGNS, 'g');
+      const glow = document.createElementNS(SVGNS, 'path');
+      glow.classList.add('war-front-glow');
+      glow.setAttribute('d', frontD);
+      const sharp = document.createElementNS(SVGNS, 'path');
+      sharp.classList.add('war-front');
+      sharp.setAttribute('d', frontD);
+      frontSlide.append(glow, sharp);
+      frontGroup.append(frontSlide);
+      FRONTLINE_LAYER.append(frontGroup);
+
+      fx = {
+        pairKey,
+        overlayGroup,
+        overlaySlide,
+        overlay,
+        frontGroup,
+        frontSlide,
+        rendered: null,
+        target: 0.5,
+      };
+      borderFx.set(stateRecord.id, fx);
+    }
+
+    fx.refId = geo.refId;
+    fx.otherId = geo.otherId;
+    fx.cx = geo.cx;
+    fx.cy = geo.cy;
+    fx.angleDeg = geo.angleDeg;
+    fx.R = geo.R;
+    fx.refColor = campaign.factionsById[geo.refId]?.color ?? '#7b6550';
+    fx.otherColor = campaign.factionsById[geo.otherId]?.color ?? '#5f4e3b';
+    fx.overlay.setAttribute('fill', fx.otherColor);
+    return fx;
+  }
+
+  function resetMapFx() {
+    borderFx.forEach((fx) => {
+      fx.overlayGroup.remove();
+      fx.frontGroup.remove();
+    });
+    borderFx.clear();
+    if (TERRITORY_LAYER) TERRITORY_LAYER.innerHTML = '';
+    if (FRONTLINE_LAYER) FRONTLINE_LAYER.innerHTML = '';
+    particles.length = 0;
+  }
+
+  function renderTerritories() {
     if (!campaign) return;
+    const contestedIds = new Set();
     const pathElements = FILL_LAYER.querySelectorAll('.state-shape');
+
     pathElements.forEach((pathElement) => {
       const stateId = pathElement.getAttribute('data-state-id');
       const stateRecord = campaign.statesById[stateId];
-      const dominant = dominantControl(stateRecord);
-      const ownerFaction = campaign.factionsById[dominant.factionId];
-      const contested = dominant.share < 86 || Object.values(stateRecord.control).filter((share) => share > 8).length > 1;
-      const brightness = (100 - dominant.share) / 170;
-      pathElement.style.fill = blendHex(ownerFaction.color, brightness);
+      const top = topTwoControllers(stateRecord);
+      const dominant = top[0] || dominantControl(stateRecord);
+      const runnerUp = top[1];
+      const contested = Boolean(runnerUp && runnerUp.share >= 1.5);
+
       pathElement.classList.toggle('state-contested', contested);
       pathElement.classList.toggle('state-selected', campaign.selectedStateId === stateId);
+
+      if (contested) {
+        contestedIds.add(stateId);
+        const fx = ensureBorderFx(stateRecord, dominant.factionId, runnerUp.factionId);
+        pathElement.style.fill = fx.refColor;
+        const refShare = stateRecord.control[fx.refId] || 0;
+        const otherShare = stateRecord.control[fx.otherId] || 0;
+        fx.target = clamp(refShare / Math.max(refShare + otherShare, 0.0001), 0.03, 0.97);
+        // Snap on first sight, or when the tab is hidden (rAF is paused there, so
+        // there is no frame loop to ease the front toward its new position).
+        if (fx.rendered === null || document.hidden) fx.rendered = fx.target;
+      } else {
+        const ownerFaction = campaign.factionsById[dominant.factionId] || { color: '#7b6550' };
+        pathElement.style.fill = ownerFaction.color;
+      }
     });
+
+    borderFx.forEach((fx, stateId) => {
+      if (!contestedIds.has(stateId)) {
+        fx.overlayGroup.remove();
+        fx.frontGroup.remove();
+        borderFx.delete(stateId);
+      }
+    });
+
+    animateBorders(0);
+  }
+
+  function animateBorders(delta) {
+    if (!borderFx.size) return;
+    const speed = clamp(delta / 200, 0, 1);
+    borderFx.forEach((fx) => {
+      if (fx.rendered === null) fx.rendered = fx.target;
+      fx.rendered += (fx.target - fx.rendered) * speed;
+      if (Math.abs(fx.target - fx.rendered) < 0.0015) fx.rendered = fx.target;
+      const offset = (2 * fx.rendered - 1) * fx.R;
+      const transform = `translate(${fx.cx} ${fx.cy}) rotate(${fx.angleDeg}) translate(${offset.toFixed(2)} 0)`;
+      fx.overlaySlide.setAttribute('transform', transform);
+      fx.frontSlide.setAttribute('transform', transform);
+    });
+  }
+
+  // Bold national borders: only the arcs between differently-owned states.
+  // Recomputed each turn, so the frontier redraws to a new line when a state flips.
+  function renderFrontierMesh() {
+    if (!campaign || !mapModel.topo || !mapModel.statesObject) return;
+    FRONTIER_LAYER.innerHTML = '';
+    const ownerByFips = {};
+    Object.values(campaign.statesById).forEach((stateRecord) => {
+      ownerByFips[stateRecord.id] = stateRecord.ownerFactionId;
+    });
+
+    const isContiguous = (geometry) => CONTIGUOUS_FIPS.has(String(geometry.id).padStart(2, '0'));
+    const frontierMesh = topojson.mesh(mapModel.topo, mapModel.statesObject, (a, b) => {
+      if (a === b) return false;
+      if (!isContiguous(a) || !isContiguous(b)) return false;
+      const ownerA = ownerByFips[String(a.id).padStart(2, '0')];
+      const ownerB = ownerByFips[String(b.id).padStart(2, '0')];
+      return ownerA !== ownerB;
+    });
+
+    const d = mapModel.pathGenerator(frontierMesh);
+    if (d) {
+      const path = document.createElementNS(SVGNS, 'path');
+      path.setAttribute('d', d);
+      path.classList.add('frontier-line');
+      FRONTIER_LAYER.append(path);
+    }
+  }
+
+  function starPath(cx, cy, points, outer, inner) {
+    let d = '';
+    for (let i = 0; i < points * 2; i += 1) {
+      const radius = i % 2 === 0 ? outer : inner;
+      const angle = (Math.PI / points) * i - Math.PI / 2;
+      const x = cx + Math.cos(angle) * radius;
+      const y = cy + Math.sin(angle) * radius;
+      d += `${i === 0 ? 'M' : 'L'}${x.toFixed(2)},${y.toFixed(2)} `;
+    }
+    return `${d}Z`;
+  }
+
+  function renderCapitals() {
+    if (!campaign) return;
+    CAPITAL_LAYER.innerHTML = '';
+    const fragment = document.createDocumentFragment();
+    Object.values(campaign.factionsById).forEach((faction) => {
+      if (faction.statesOwned <= 0) return;
+      const capital = campaign.statesById[faction.capitalStateId];
+      if (!capital || capital.ownerFactionId !== faction.id) return;
+      const [x, y] = capital.centroid;
+      const group = document.createElementNS(SVGNS, 'g');
+      group.classList.add('capital-marker');
+      if (faction.isPlayer) group.classList.add('capital-player');
+      group.setAttribute('transform', `translate(${x} ${y})`);
+
+      if (faction.isPlayer) {
+        const ring = document.createElementNS(SVGNS, 'circle');
+        ring.classList.add('capital-ring');
+        ring.setAttribute('cx', '0');
+        ring.setAttribute('cy', '0');
+        ring.setAttribute('r', '8.5');
+        group.append(ring);
+      }
+
+      const star = document.createElementNS(SVGNS, 'path');
+      star.classList.add('capital-star');
+      star.setAttribute('d', starPath(0, 0, 5, faction.isPlayer ? 6.4 : 5.2, faction.isPlayer ? 2.9 : 2.3));
+      star.setAttribute('fill', faction.color);
+      group.append(star);
+      fragment.append(group);
+    });
+    CAPITAL_LAYER.append(fragment);
+  }
+
+  function escapeHtml(value) {
+    return String(value).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  }
+
+  function renderStandings() {
+    if (!campaign || !EL.standingsList) return;
+    const factions = Object.values(campaign.factionsById)
+      .filter((faction) => faction.statesOwned > 0)
+      .sort((a, b) => b.statesOwned - a.statesOwned || b.power - a.power);
+    const maxOwned = Math.max(1, ...factions.map((faction) => faction.statesOwned));
+
+    EL.standingsList.innerHTML = factions
+      .map((faction) => {
+        const widthPct = Math.round((faction.statesOwned / maxOwned) * 100);
+        return `<div class="standings-row${faction.isPlayer ? ' is-player' : ''}">`
+          + `<span class="standings-swatch" style="background:${faction.color}"></span>`
+          + `<span class="standings-name">${faction.isPlayer ? '★ ' : ''}${escapeHtml(faction.name)}</span>`
+          + `<span class="standings-bar"><span style="width:${widthPct}%;background:${faction.color}"></span></span>`
+          + `<span class="standings-count">${faction.statesOwned}</span>`
+          + '</div>';
+      })
+      .join('');
+  }
+
+  function updateVictoryBanner() {
+    if (!EL.campaignBanner) return;
+    const ended = campaign.status === 'Victory' || campaign.status === 'Defeat';
+    EL.campaignBanner.classList.toggle('hidden', !ended);
+    if (!ended) return;
+    const victory = campaign.status === 'Victory';
+    EL.campaignBanner.classList.toggle('is-victory', victory);
+    EL.campaignBanner.classList.toggle('is-defeat', !victory);
+    const ruler = sanitizeRulerName(campaign.rulerName);
+    EL.bannerTitle.textContent = victory ? 'Continental Dominion' : 'The Realm Has Fallen';
+    EL.bannerText.textContent = victory
+      ? `${ruler} unites all 48 continental states beneath a single crown. The chronicle is closed in triumph.`
+      : `${ruler}'s banner is struck from the map. The remaining realms carve up the continent.`;
   }
 
   function renderAttackVectors() {
@@ -1257,15 +2119,32 @@
     VECTOR_LAYER.innerHTML = '';
     const fragment = document.createDocumentFragment();
     campaign.vectors.forEach((vector) => {
-      const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
-      line.classList.add('attack-vector');
       const opacity = clamp(vector.ttl / vector.maxTtl, 0.15, 1);
-      line.setAttribute('x1', String(vector.from[0]));
-      line.setAttribute('y1', String(vector.from[1]));
-      line.setAttribute('x2', String(vector.to[0]));
-      line.setAttribute('y2', String(vector.to[1]));
-      line.setAttribute('stroke-opacity', opacity.toFixed(2));
-      fragment.append(line);
+      const [fx, fy] = vector.from;
+      const [tx, ty] = vector.to;
+      const midX = (fx + tx) / 2;
+      const midY = (fy + ty) / 2;
+      // Bow the arrow perpendicular to its run for a swept campaign-arrow look.
+      const dx = tx - fx;
+      const dy = ty - fy;
+      const length = Math.hypot(dx, dy) || 1;
+      const bow = Math.min(length * 0.18, 26);
+      const ctrlX = midX + (-dy / length) * bow;
+      const ctrlY = midY + (dx / length) * bow;
+      const d = `M${fx.toFixed(1)},${fy.toFixed(1)} Q${ctrlX.toFixed(1)},${ctrlY.toFixed(1)} ${tx.toFixed(1)},${ty.toFixed(1)}`;
+
+      const glow = document.createElementNS(SVGNS, 'path');
+      glow.classList.add('attack-vector-glow');
+      glow.setAttribute('d', d);
+      glow.setAttribute('stroke-opacity', (opacity * 0.7).toFixed(2));
+
+      const path = document.createElementNS(SVGNS, 'path');
+      path.classList.add('attack-vector');
+      path.setAttribute('d', d);
+      path.setAttribute('stroke-opacity', opacity.toFixed(2));
+      path.setAttribute('marker-end', 'url(#vector-arrow)');
+
+      fragment.append(glow, path);
     });
     VECTOR_LAYER.append(fragment);
   }
@@ -1273,16 +2152,24 @@
   function renderHUDMetrics() {
     if (!campaign) return;
     const playerFaction = campaign.factionsById[campaign.playerFactionId];
+    const rulerName = sanitizeRulerName(campaign.rulerName || playerFaction.rulerName);
     EL.metricLevies.textContent = shortNumber(playerFaction.resources.levies);
     EL.metricGold.textContent = shortNumber(playerFaction.resources.gold);
     EL.metricRations.textContent = shortNumber(playerFaction.resources.rations);
     EL.metricSeason.textContent = String(campaign.season);
     EL.metricRealm.textContent = playerFaction.name;
+    EL.metricRuler.textContent = rulerName;
     EL.metricHoldings.textContent = `${playerFaction.statesOwned} / 48`;
     EL.metricStatus.textContent = campaign.status;
-    EL.playerDoctrine.value = playerFaction.doctrine;
-    EL.campaignDoctrine.value = playerFaction.doctrine;
-    EL.doctrineNote.textContent = DOCTRINES[playerFaction.doctrine].note;
+    EL.rulerName.value = rulerName;
+    const currentDoctrine = DOCTRINES[playerFaction.doctrine] ? playerFaction.doctrine : 'fabian';
+    playerFaction.doctrine = currentDoctrine;
+    EL.playerDoctrine.value = currentDoctrine;
+    if (!DOCTRINES[EL.campaignDoctrine.value]) {
+      EL.campaignDoctrine.value = currentDoctrine;
+    }
+    EL.doctrineInline.textContent = DOCTRINES[currentDoctrine].label;
+    renderDoctrineNotes();
   }
 
   function renderAll() {
@@ -1290,11 +2177,20 @@
     renderHUDMetrics();
     renderAllocationReadouts();
     renderSourceTargetOptions();
+    renderConquestAdvisor();
     renderQueue();
     renderChronicle();
     renderTheater();
-    renderMapStateStyles();
+    renderTerritories();
+    renderFrontierMesh();
+    renderCapitals();
+    renderOrders();
+    renderStandings();
     renderAttackVectors();
+    renderStrategistQuote();
+    renderObjective();
+    renderLoopSteps();
+    updateVictoryBanner();
   }
 
   function applyCamera() {
@@ -1319,11 +2215,11 @@
   }
 
   function setupPanZoom() {
-    ROOT.addEventListener('mousedown', (event) => {
-      const interactive = event.target.closest('.hud-panel, .hud-ribbon, button, select, input, #tutorial-overlay, #settings-overlay');
+    MAP_STAGE.addEventListener('mousedown', (event) => {
+      const interactive = event.target.closest('button, select, input, .overlay');
       if (interactive || event.button !== 0) return;
       dragging = true;
-      ROOT.classList.add('dragging');
+      MAP_STAGE.classList.add('dragging');
       dragStart = { x: event.clientX, y: event.clientY, camX: camera.x, camY: camera.y };
     });
 
@@ -1341,11 +2237,11 @@
 
     window.addEventListener('mouseup', () => {
       dragging = false;
-      ROOT.classList.remove('dragging');
+      MAP_STAGE.classList.remove('dragging');
     });
 
-    ROOT.addEventListener('wheel', (event) => {
-      const interactive = event.target.closest('.hud-panel, .hud-ribbon, button, select, input, #tutorial-overlay, #settings-overlay');
+    MAP_STAGE.addEventListener('wheel', (event) => {
+      const interactive = event.target.closest('button, select, input, .overlay');
       if (interactive) return;
       event.preventDefault();
       const svgPoint = clientToSvgPoint(event.clientX, event.clientY);
@@ -1362,35 +2258,48 @@
 
   function resizeCanvas() {
     const dpr = window.devicePixelRatio || 1;
-    const width = Math.floor(window.innerWidth * dpr);
-    const height = Math.floor(window.innerHeight * dpr);
+    const rect = MAP_STAGE.getBoundingClientRect();
+    const width = Math.max(1, Math.floor(rect.width * dpr));
+    const height = Math.max(1, Math.floor(rect.height * dpr));
     if (ASH_CANVAS.width !== width || ASH_CANVAS.height !== height) {
       ASH_CANVAS.width = width;
       ASH_CANVAS.height = height;
-      ASH_CANVAS.style.width = `${window.innerWidth}px`;
-      ASH_CANVAS.style.height = `${window.innerHeight}px`;
+      ASH_CANVAS.style.width = `${rect.width}px`;
+      ASH_CANVAS.style.height = `${rect.height}px`;
     }
   }
 
-  function spawnParticlesForContestedStates() {
-    if (!campaign) return;
-    const contestedStates = Object.values(campaign.statesById).filter((stateRecord) => {
-      const controlValues = Object.values(stateRecord.control).sort((a, b) => b - a);
-      return controlValues.length > 1 && controlValues[0] < 90;
-    });
+  const EMBER_COLORS = [
+    [214, 120, 58],
+    [196, 86, 54],
+    [232, 178, 96],
+    [120, 60, 44],
+  ];
 
-    contestedStates.forEach((stateRecord) => {
-      if (Math.random() > 0.16) return;
-      const point = screenPointFromWorld(stateRecord.centroid[0], stateRecord.centroid[1]);
-      if (point.x < -40 || point.x > window.innerWidth + 40 || point.y < -40 || point.y > window.innerHeight + 40) return;
+  // Embers rise from the live war fronts (the moving border) of each contested state.
+  function spawnFrontEmbers(stageRect) {
+    if (!campaign || !borderFx.size) return;
+    borderFx.forEach((fx) => {
+      if (Math.random() > 0.24) return;
+      const rad = (fx.angleDeg * Math.PI) / 180;
+      const offset = (2 * fx.rendered - 1) * fx.R;
+      const worldX = fx.cx + Math.cos(rad) * offset;
+      const worldY = fx.cy + Math.sin(rad) * offset;
+      const point = screenPointFromWorld(worldX, worldY);
+      const x = point.x - stageRect.left;
+      const y = point.y - stageRect.top;
+      if (x < -40 || x > stageRect.width + 40 || y < -40 || y > stageRect.height + 40) return;
+      const spread = 12 + fx.R * 0.4 * camera.scale;
+      const color = EMBER_COLORS[Math.floor(Math.random() * EMBER_COLORS.length)];
       particles.push({
-        x: point.x + (Math.random() - 0.5) * 16,
-        y: point.y + (Math.random() - 0.5) * 9,
-        vx: (Math.random() - 0.5) * 0.24,
-        vy: -(0.25 + Math.random() * 0.66),
-        life: 36 + Math.random() * 32,
-        maxLife: 64,
-        size: 1 + Math.random() * 1.9,
+        x: x + (Math.random() - 0.5) * spread,
+        y: y + (Math.random() - 0.5) * spread,
+        vx: (Math.random() - 0.5) * 0.3,
+        vy: -(0.3 + Math.random() * 0.8),
+        life: 34 + Math.random() * 34,
+        maxLife: 68,
+        size: 0.8 + Math.random() * 1.8,
+        color,
       });
     });
   }
@@ -1400,14 +2309,17 @@
     const delta = timestamp - lastFrameTime;
     lastFrameTime = timestamp;
 
+    animateBorders(delta);
+
     resizeCanvas();
+    const stageRect = MAP_STAGE.getBoundingClientRect();
     const ctx = ASH_CANVAS.getContext('2d');
     ctx.clearRect(0, 0, ASH_CANVAS.width, ASH_CANVAS.height);
     ctx.save();
     const dpr = window.devicePixelRatio || 1;
     ctx.scale(dpr, dpr);
 
-    spawnParticlesForContestedStates();
+    spawnFrontEmbers(stageRect);
 
     for (let i = particles.length - 1; i >= 0; i -= 1) {
       const particle = particles[i];
@@ -1419,8 +2331,9 @@
         continue;
       }
       const alpha = clamp(particle.life / particle.maxLife, 0, 1);
+      const [r, g, b] = particle.color || [94, 42, 42];
       ctx.beginPath();
-      ctx.fillStyle = `rgba(94, 42, 42, ${alpha * 0.36})`;
+      ctx.fillStyle = `rgba(${r}, ${g}, ${b}, ${(alpha * 0.5).toFixed(3)})`;
       ctx.arc(particle.x, particle.y, particle.size, 0, Math.PI * 2);
       ctx.fill();
     }
@@ -1464,19 +2377,46 @@
     }
   }
 
-  function setupPanelToggle(button, panel, axisClass) {
-    button.addEventListener('click', () => {
-      panel.classList.toggle('panel-collapsed');
-      panel.classList.toggle(axisClass);
-    });
+  function populateSaveEditor() {
+    if (!campaign) return;
+    const playerFaction = campaign.factionsById[campaign.playerFactionId];
+    EL.editorSeason.value = String(Math.max(1, Math.round(campaign.season)));
+    EL.editorPlayerLevies.value = String(Math.round(playerFaction.resources.levies));
+    EL.editorPlayerGold.value = String(Math.round(playerFaction.resources.gold));
+    EL.editorPlayerRations.value = String(Math.round(playerFaction.resources.rations));
+    EL.editorRulerName.value = sanitizeRulerName(campaign.rulerName || playerFaction.rulerName);
+    EL.editorPlayerDoctrine.value = playerFaction.doctrine;
   }
 
   function openSettings() {
+    populateSaveEditor();
     EL.settingsOverlay.style.display = 'flex';
   }
 
   function closeSettings() {
     EL.settingsOverlay.style.display = 'none';
+  }
+
+  function applySaveEditor() {
+    if (!campaign) return;
+    const playerFaction = campaign.factionsById[campaign.playerFactionId];
+    if (!playerFaction) return;
+
+    campaign.season = Math.max(1, Math.round(Number(EL.editorSeason.value) || campaign.season));
+    playerFaction.resources.levies = clamp(Number(EL.editorPlayerLevies.value) || playerFaction.resources.levies, 0, 999999);
+    playerFaction.resources.gold = clamp(Number(EL.editorPlayerGold.value) || playerFaction.resources.gold, 0, 999999);
+    playerFaction.resources.rations = clamp(Number(EL.editorPlayerRations.value) || playerFaction.resources.rations, 0, 999999);
+    const rulerName = sanitizeRulerName(EL.editorRulerName.value);
+    campaign.rulerName = rulerName;
+    playerFaction.rulerName = rulerName;
+    if (DOCTRINES[EL.editorPlayerDoctrine.value]) {
+      playerFaction.doctrine = EL.editorPlayerDoctrine.value;
+    }
+
+    campaign.chronicle.unshift(`Season ${campaign.season}: Campaign records amended from the save editor.`);
+    campaign.chronicle = campaign.chronicle.slice(0, 200);
+    persistCampaign();
+    renderAll();
   }
 
   function exportCampaign() {
@@ -1521,6 +2461,7 @@
       status: c.status,
       playerFactionId: c.playerFactionId,
       selectedStateId: c.selectedStateId,
+      rulerName: sanitizeRulerName(c.rulerName || c.factionsById.player?.rulerName || DEFAULT_RULER_NAME),
       cameraX: camera.x,
       cameraY: camera.y,
       cameraScale: camera.scale,
@@ -1533,6 +2474,7 @@
         id: faction.id,
         name: faction.name,
         color: faction.color,
+        rulerName: faction.rulerName || null,
         traitId: faction.traitId,
         traitName: faction.traitName,
         traitSummary: faction.traitSummary,
@@ -1555,6 +2497,7 @@
         prosperity: stateRecord.prosperity,
         fort: stateRecord.fort,
         pressure: stateRecord.pressure,
+        buff: stateRecord.buff || null,
       })),
       stateControl,
     };
@@ -1570,6 +2513,7 @@
         name: mapState.name,
         region: mapState.region,
         terrain: mapState.terrain,
+        buff: mapState.buff ? { ...mapState.buff, effect: { ...mapState.buff.effect } } : null,
         ownerFactionId: 'player',
         levies: 60,
         supply: 50,
@@ -1578,6 +2522,7 @@
         pressure: 50,
         neighbors: [...mapState.neighbors],
         centroid: [...mapState.centroid],
+        bounds: mapState.bounds ? [[...mapState.bounds[0]], [...mapState.bounds[1]]] : [[0, 0], [0, 0]],
         control: { player: 100 },
         frontline: false,
       };
@@ -1591,13 +2536,14 @@
         id: entry.id,
         name: entry.name,
         color: entry.color,
+        rulerName: entry.rulerName || null,
         traitId: entry.traitId,
         traitName: entry.traitName,
         traitSummary: entry.traitSummary,
         traitEffect: entry.traitEffect,
         isPlayer: Boolean(entry.isPlayer),
         aggression: Number(entry.aggression || 0),
-        doctrine: entry.doctrine || 'fabian',
+        doctrine: entry.doctrine && DOCTRINES[entry.doctrine] ? entry.doctrine : 'fabian',
         capitalStateId: entry.capitalStateId,
         statesOwned: Number(entry.statesOwned || 0),
         power: Number(entry.power || 0),
@@ -1621,6 +2567,9 @@
         stateRecord.prosperity = Number(entry.prosperity ?? stateRecord.prosperity);
         stateRecord.fort = Number(entry.fort ?? stateRecord.fort);
         stateRecord.pressure = Number(entry.pressure ?? stateRecord.pressure);
+        if (entry.buff && typeof entry.buff === 'object') {
+          stateRecord.buff = entry.buff;
+        }
         stateRecord.control = { [stateRecord.ownerFactionId]: 100 };
       });
     }
@@ -1647,10 +2596,11 @@
       status: raw.status || 'Live',
       playerFactionId: raw.playerFactionId || 'player',
       selectedStateId: raw.selectedStateId || mapModel.states[0].id,
+      rulerName: sanitizeRulerName(raw.rulerName || factionsById.player.rulerName || DEFAULT_RULER_NAME),
       allocations: {
-        levies: Number(raw.allocLevies ?? 45),
+        levies: Number(raw.allocLevies ?? 50),
         siege: Number(raw.allocSiege ?? 30),
-        civil: Number(raw.allocCivil ?? 25),
+        civil: Number(raw.allocCivil ?? 20),
       },
       queue: Array.isArray(raw.queue) ? raw.queue.map((item) => ({ ...item })) : [],
       chronicle: Array.isArray(raw.chronicle) ? [...raw.chronicle] : [],
@@ -1663,6 +2613,9 @@
         scale: Number(raw.cameraScale || 1),
       },
     };
+
+    nextCampaign.allocations = normalizeAllocationTotal({ ...nextCampaign.allocations });
+    nextCampaign.factionsById.player.rulerName = sanitizeRulerName(nextCampaign.rulerName);
 
     refreshOwnershipAndFrontline(nextCampaign);
     recalcFactionPower(nextCampaign);
@@ -1705,6 +2658,7 @@
       campaign = restored;
       camera = { ...campaign.camera };
       applyCamera();
+      resetMapFx();
       persistCampaign();
       closeSettings();
       campaign.chronicle.unshift(`Season ${campaign.season}: Campaign imported from file.`);
@@ -1717,59 +2671,126 @@
     }
   }
 
-  function setTutorialTarget(element) {
-    document.querySelectorAll('.tutorial-target').forEach((node) => node.classList.remove('tutorial-target'));
-    if (element) element.classList.add('tutorial-target');
-  }
-
   function showTutorialStep(index) {
     tutorialIndex = clamp(index, 0, tutorialSteps.length - 1);
     const step = tutorialSteps[tutorialIndex];
+    EL.tutorialStepCount.textContent = `${tutorialIndex + 1} / ${tutorialSteps.length}`;
+    EL.tutorialTitle.textContent = step.title;
     EL.tutorialText.textContent = step.text;
-    setTutorialTarget(step.target);
-    EL.tutorialBack.classList.toggle('hidden', tutorialIndex === 0);
-    EL.tutorialNext.classList.toggle('hidden', tutorialIndex >= tutorialSteps.length - 1);
-    EL.tutorialClose.classList.toggle('hidden', tutorialIndex < tutorialSteps.length - 1);
+    EL.tutorialRetreat.classList.toggle('hidden', tutorialIndex === 0);
+    const isFinalStep = tutorialIndex >= tutorialSteps.length - 1;
+    EL.tutorialAdvance.classList.toggle('hidden', isFinalStep);
+    EL.tutorialFinish.classList.toggle('hidden', !isFinalStep);
+    const showSetup = tutorialIndex === 0 || isFinalStep;
+    const tutorialForm = EL.tutorialRulerName.closest('.tutorial-form');
+    if (tutorialForm) tutorialForm.classList.toggle('hidden', !showSetup);
   }
 
   function openTutorial() {
+    EL.tutorialRulerName.value = sanitizeRulerName(EL.rulerName.value || campaign?.rulerName || DEFAULT_RULER_NAME);
+    EL.tutorialStartState.value = EL.startState.value || '48';
     EL.tutorialOverlay.style.display = 'flex';
     showTutorialStep(0);
   }
 
   function closeTutorial() {
     EL.tutorialOverlay.style.display = 'none';
-    setTutorialTarget(null);
+  }
+
+  function setupHoverHelp() {
+    if (!EL.hoverHelp) return;
+    const hoverTargets = document.querySelectorAll('[data-tip]');
+    hoverTargets.forEach((node) => {
+      node.addEventListener('mouseenter', (event) => {
+        const tip = node.getAttribute('data-tip');
+        if (!tip) return;
+        EL.hoverHelp.textContent = tip;
+        EL.hoverHelp.classList.remove('hidden');
+        const pad = 16;
+        EL.hoverHelp.style.left = `${event.clientX + pad}px`;
+        EL.hoverHelp.style.top = `${event.clientY + pad}px`;
+      });
+      node.addEventListener('mousemove', (event) => {
+        const pad = 16;
+        EL.hoverHelp.style.left = `${event.clientX + pad}px`;
+        EL.hoverHelp.style.top = `${event.clientY + pad}px`;
+      });
+      node.addEventListener('mouseleave', () => {
+        EL.hoverHelp.classList.add('hidden');
+      });
+    });
+  }
+
+  function launchNewCampaign(startStateId, rulerName) {
+    stopAutoAdvance();
+    const safeState = mapModel.statesById[startStateId] ? startStateId : (EL.startState.value || '48');
+    const safeRuler = sanitizeRulerName(rulerName || EL.rulerName.value || DEFAULT_RULER_NAME);
+    EL.rulerName.value = safeRuler;
+    EL.tutorialRulerName.value = safeRuler;
+    EL.startState.value = safeState;
+    EL.tutorialStartState.value = safeState;
+    campaign = initializeCampaign(safeState, safeRuler);
+    camera = { x: 0, y: 0, scale: 1 };
+    applyCamera();
+    resetMapFx();
+    persistCampaign();
+    renderAll();
   }
 
   function setupEvents() {
     EL.newCampaign.addEventListener('click', () => {
-      stopAutoAdvance();
-      campaign = initializeCampaign(EL.startState.value);
-      camera = { x: 0, y: 0, scale: 1 };
-      applyCamera();
-      persistCampaign();
-      renderAll();
+      launchNewCampaign(EL.startState.value, EL.rulerName.value);
+    });
+
+    EL.startState.addEventListener('change', () => {
+      EL.tutorialStartState.value = EL.startState.value;
+    });
+
+    EL.rulerName.addEventListener('input', () => {
+      EL.tutorialRulerName.value = EL.rulerName.value;
+    });
+
+    EL.tutorialStartState.addEventListener('change', () => {
+      EL.startState.value = EL.tutorialStartState.value;
+    });
+
+    EL.tutorialRulerName.addEventListener('input', () => {
+      EL.rulerName.value = EL.tutorialRulerName.value;
     });
 
     EL.playerDoctrine.addEventListener('change', () => {
       updatePlayerDoctrine(EL.playerDoctrine.value);
+      renderDoctrineNotes();
     });
 
-    [EL.allocLevies, EL.allocSiege, EL.allocCivil].forEach((slider) => {
-      slider.addEventListener('input', () => {
-        applyAllocationInputs();
-      });
-      slider.addEventListener('change', () => {
-        if (!campaign) return;
-        campaign.chronicle.unshift(`Season ${campaign.season}: Royal allocation revised.`);
-        campaign.chronicle = campaign.chronicle.slice(0, 200);
-        renderAll();
-      });
+    EL.campaignDoctrine.addEventListener('change', () => {
+      renderDoctrineNotes();
+      if (EL.sourceState.value) {
+        renderTargetOptions(EL.sourceState.value);
+      }
+      renderConquestAdvisor();
+      renderOrders();
+      renderLoopSteps();
     });
+
+    EL.allocLeviesDec.addEventListener('click', () => applyAllocationDelta('levies', -ALLOCATION_STEP));
+    EL.allocLeviesInc.addEventListener('click', () => applyAllocationDelta('levies', ALLOCATION_STEP));
+    EL.allocSiegeDec.addEventListener('click', () => applyAllocationDelta('siege', -ALLOCATION_STEP));
+    EL.allocSiegeInc.addEventListener('click', () => applyAllocationDelta('siege', ALLOCATION_STEP));
+    EL.allocCivilDec.addEventListener('click', () => applyAllocationDelta('civil', -ALLOCATION_STEP));
+    EL.allocCivilInc.addEventListener('click', () => applyAllocationDelta('civil', ALLOCATION_STEP));
 
     EL.sourceState.addEventListener('change', () => {
       renderTargetOptions(EL.sourceState.value);
+      renderConquestAdvisor();
+      renderOrders();
+      renderLoopSteps();
+    });
+
+    EL.targetState.addEventListener('change', () => {
+      renderConquestAdvisor();
+      renderOrders();
+      renderLoopSteps();
     });
 
     EL.queueCampaign.addEventListener('click', () => {
@@ -1784,28 +2805,34 @@
       toggleAutoAdvance();
     });
 
-    EL.theaterPressure.addEventListener('input', () => {
-      if (!campaign || !campaign.selectedStateId) return;
-      const stateRecord = campaign.statesById[campaign.selectedStateId];
-      if (!stateRecord) return;
-      stateRecord.pressure = Number(EL.theaterPressure.value);
-      EL.theaterPressureReadout.textContent = `${Math.round(stateRecord.pressure)}%`;
-    });
+    EL.theaterPressureDec.addEventListener('click', () => adjustSelectedStatePressure(-PRESSURE_STEP));
+    EL.theaterPressureInc.addEventListener('click', () => adjustSelectedStatePressure(PRESSURE_STEP));
+
+    if (EL.bannerDismiss) {
+      EL.bannerDismiss.addEventListener('click', () => {
+        EL.campaignBanner.classList.add('hidden');
+      });
+    }
 
     EL.openSettings.addEventListener('click', openSettings);
     EL.closeSettings.addEventListener('click', closeSettings);
     EL.exportSave.addEventListener('click', exportCampaign);
     EL.importSave.addEventListener('click', importCampaignFromFile);
     EL.wipeSave.addEventListener('click', wipeSave);
+    EL.applySaveEditor.addEventListener('click', applySaveEditor);
 
-    EL.tutorialBack.addEventListener('click', () => showTutorialStep(tutorialIndex - 1));
-    EL.tutorialNext.addEventListener('click', () => showTutorialStep(tutorialIndex + 1));
-    EL.tutorialClose.addEventListener('click', closeTutorial);
-
-    setupPanelToggle(EL.toggleWarRoom, EL.panelWarRoom, 'left');
-    setupPanelToggle(EL.toggleChronicle, EL.panelChronicle, 'right');
-    setupPanelToggle(EL.toggleDeclarations, EL.panelDeclarations, 'bottom');
-    setupPanelToggle(EL.toggleTheater, EL.panelTheater, 'right');
+    EL.tutorialRetreat.addEventListener('click', () => showTutorialStep(tutorialIndex - 1));
+    EL.tutorialAdvance.addEventListener('click', () => showTutorialStep(tutorialIndex + 1));
+    EL.tutorialFinish.addEventListener('click', () => {
+      launchNewCampaign(EL.tutorialStartState.value, EL.tutorialRulerName.value);
+      closeTutorial();
+    });
+    EL.tutorialOverlay.addEventListener('click', (event) => {
+      if (event.target === EL.tutorialOverlay) closeTutorial();
+    });
+    EL.settingsOverlay.addEventListener('click', (event) => {
+      if (event.target === EL.settingsOverlay) closeSettings();
+    });
 
     window.addEventListener('resize', () => {
       resizeCanvas();
@@ -1819,6 +2846,7 @@
     renderMapScaffold();
     renderStartStateOptions('48');
     setupPanZoom();
+    setupHoverHelp();
     setupEvents();
 
     const restored = restoreCampaign();
@@ -1827,14 +2855,13 @@
       campaign = restored;
       camera = { ...campaign.camera };
     } else {
-      campaign = initializeCampaign(EL.startState.value || '48');
+      campaign = initializeCampaign(EL.startState.value || '48', EL.rulerName.value || DEFAULT_RULER_NAME);
       persistCampaign();
     }
 
     applyCamera();
     renderAll();
     lucide.createIcons({ attrs: { 'stroke-width': 1.8, width: 15, height: 15 } });
-
     if (hadNoCampaign) {
       openTutorial();
     }
@@ -1842,5 +2869,15 @@
     animationHandle = requestAnimationFrame(animateLayer);
   }
 
-  initialize();
+  initialize().catch((error) => {
+    console.error(error);
+    const mapStage = document.getElementById('map-stage');
+    if (mapStage) {
+      mapStage.innerHTML = `<div style="padding:1rem;font-family:'Source Sans 3',sans-serif;color:#3f1f1f;"><strong>Map bootstrap failed.</strong><br>${error.message}</div>`;
+    }
+  });
 })();
+
+
+
+
