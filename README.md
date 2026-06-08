@@ -39,6 +39,11 @@ Alaska and Hawaii are intentionally reserved for a later expansion update.
 
 - Auto-save to `localStorage` at the end of every season.
 
+## Honest Label
+
+- Project type: browser strategy game / campaign simulation
+- Stack truth: HTML, CSS, JavaScript, local map data
+
 ## Platform honesty
 
 - Project type: Browser strategy game
