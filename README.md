@@ -77,3 +77,11 @@ http://127.0.0.1:8100
 - Portfolio project type: browser simulation game
 - Focus areas: systems design, war simulation loops, map rendering, and interactive UX polish
 
+## Concise Demo Route
+
+Keep the walkthrough to one clean campaign beat:
+
+1. Pick a starting state and one neighboring target.
+2. Show doctrine choice, supply pressure, and the queued campaign.
+3. Advance one season and explain the control shift without touring every panel.
+
