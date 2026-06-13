@@ -286,6 +286,7 @@
     closeSettings: document.getElementById('close-settings'),
     settingsOverlay: document.getElementById('settings-overlay'),
     exportSave: document.getElementById('export-save'),
+    exportBrief: document.getElementById('export-brief'),
     importSave: document.getElementById('import-save'),
     importFile: document.getElementById('import-file'),
     wipeSave: document.getElementById('wipe-save'),
@@ -2435,6 +2436,72 @@
     renderAll();
   }
 
+  function buildCampaignBriefMarkdown() {
+    if (!campaign) return '';
+    const playerFaction = campaign.factionsById[campaign.playerFactionId];
+    const playerStates = Object.values(campaign.statesById)
+      .filter((stateRecord) => stateRecord.ownerFactionId === campaign.playerFactionId)
+      .sort((a, b) => b.control[campaign.playerFactionId] - a.control[campaign.playerFactionId]);
+    const frontierStates = playerStates
+      .filter((stateRecord) => stateRecord.frontline)
+      .sort((a, b) => (b.pressure + b.levies) - (a.pressure + a.levies))
+      .slice(0, 6);
+    const standings = Object.values(campaign.factionsById)
+      .sort((a, b) => b.statesOwned - a.statesOwned)
+      .slice(0, 6);
+    const queueRows = campaign.queue.slice(0, 6).map((action, index) => {
+      const sourceState = campaign.statesById[action.sourceId];
+      const targetState = campaign.statesById[action.targetId];
+      return `${index + 1}. ${sourceState.abbr} -> ${targetState.abbr} | ${DOCTRINES[action.doctrineKey].label} | Pressure ${action.intensity}%`;
+    });
+    const chronicleRows = campaign.chronicle.slice(0, 8).map((entry) => `- ${entry}`);
+
+    return [
+      '# Continental Feuds Campaign Brief',
+      '',
+      `- Season: ${campaign.season}`,
+      `- Ruler: ${campaign.rulerName}`,
+      `- Realm: ${playerFaction.name}`,
+      `- Status: ${campaign.status}`,
+      `- Holdings: ${playerFaction.statesOwned} / 48`,
+      `- Field doctrine: ${DOCTRINES[playerFaction.doctrine]?.label || playerFaction.doctrine}`,
+      `- Treasury: ${Math.round(playerFaction.resources.gold)} gold`,
+      `- Levies: ${Math.round(playerFaction.resources.levies)}`,
+      `- Rations: ${Math.round(playerFaction.resources.rations)}`,
+      '',
+      '## Frontline Pressure',
+      ...(frontierStates.length
+        ? frontierStates.map((stateRecord) => `- ${stateRecord.name} (${stateRecord.abbr}) | control ${Math.round(stateRecord.control[campaign.playerFactionId])}% | pressure ${stateRecord.pressure}% | levies ${Math.round(stateRecord.levies)}`)
+        : ['- No frontline territories.']),
+      '',
+      '## Declared Maneuvers',
+      ...(queueRows.length ? queueRows : ['- No maneuvers queued.']),
+      '',
+      '## Continental Standings',
+      ...standings.map((faction, index) => `${index + 1}. ${faction.name} | ${faction.statesOwned} states | doctrine ${DOCTRINES[faction.doctrine]?.label || faction.doctrine}`),
+      '',
+      '## Recent Chronicle',
+      ...(chronicleRows.length ? chronicleRows : ['- No chronicle entries yet.']),
+      '',
+    ].join('\n');
+  }
+
+  function exportCampaignBrief() {
+    if (!campaign) return;
+    const brief = buildCampaignBriefMarkdown();
+    const blob = new Blob([brief], { type: 'text/markdown' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `continental-feuds-brief-season-${campaign.season}.md`;
+    document.body.append(link);
+    link.click();
+    link.remove();
+    URL.revokeObjectURL(url);
+    campaign.chronicle.unshift(`Season ${campaign.season}: Campaign brief exported.`);
+    renderAll();
+  }
+
   function wipeSave() {
     localStorage.removeItem(STORAGE_KEY);
     if (campaign) {
@@ -2817,6 +2884,7 @@
     EL.openSettings.addEventListener('click', openSettings);
     EL.closeSettings.addEventListener('click', closeSettings);
     EL.exportSave.addEventListener('click', exportCampaign);
+    EL.exportBrief.addEventListener('click', exportCampaignBrief);
     EL.importSave.addEventListener('click', importCampaignFromFile);
     EL.wipeSave.addEventListener('click', wipeSave);
     EL.applySaveEditor.addEventListener('click', applySaveEditor);
@@ -2877,7 +2945,6 @@
     }
   });
 })();
-
 
 
 

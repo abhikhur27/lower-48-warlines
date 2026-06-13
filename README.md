@@ -51,6 +51,7 @@ Alaska and Hawaii are intentionally reserved for a later expansion update.
 - Positioning: this is a simulation-heavy web game, not a native systems project
 - Export save to structured flat JSON (`factions`, `states`, `stateControl`, `queue`, `chronicle`).
 - Import save from JSON file.
+- Export a Markdown campaign brief with standings, frontier pressure, queued maneuvers, and recent chronicle entries.
 
 ## Tech stack
 
