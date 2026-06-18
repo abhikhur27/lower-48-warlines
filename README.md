@@ -52,6 +52,8 @@ Alaska and Hawaii are intentionally reserved for a later expansion update.
 - Export save to structured flat JSON (`factions`, `states`, `stateControl`, `queue`, `chronicle`).
 - Import save from JSON file.
 - Export a Markdown campaign brief with standings, frontier pressure, queued maneuvers, and recent chronicle entries.
+- Objective line now surfaces the best frontier opening plus strongest / most-contested region posture instead of only raw holdings count.
+- Exported campaign briefs now include a regional posture section and a recommended opening for the next season.
 
 ## Tech stack
 

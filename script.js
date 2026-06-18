@@ -1599,10 +1599,83 @@
     EL.strategistQuote.textContent = `“${quote}” — Sun Tzu`;
   }
 
+  function campaignRegionSummary() {
+    if (!campaign) return [];
+    const regionTotals = new Map();
+    Object.values(campaign.statesById).forEach((stateRecord) => {
+      if (!regionTotals.has(stateRecord.region)) {
+        regionTotals.set(stateRecord.region, { total: 0, held: 0, contested: 0 });
+      }
+      const bucket = regionTotals.get(stateRecord.region);
+      bucket.total += 1;
+      if (stateRecord.ownerFactionId === campaign.playerFactionId) {
+        bucket.held += 1;
+      }
+      if ((stateRecord.control[campaign.playerFactionId] || 0) >= 25 && stateRecord.ownerFactionId !== campaign.playerFactionId) {
+        bucket.contested += 1;
+      }
+    });
+
+    return [...regionTotals.entries()]
+      .map(([region, totals]) => ({
+        region,
+        ...totals,
+        share: totals.total ? totals.held / totals.total : 0,
+      }))
+      .sort((a, b) => b.share - a.share || b.held - a.held);
+  }
+
+  function bestPlayerFrontierAction() {
+    if (!campaign) return null;
+    const playerFaction = campaign.factionsById[campaign.playerFactionId];
+    let best = null;
+
+    Object.values(campaign.statesById).forEach((sourceState) => {
+      if (sourceState.ownerFactionId !== campaign.playerFactionId || !sourceState.frontline) return;
+      sourceState.neighbors.forEach((targetId) => {
+        const targetState = campaign.statesById[targetId];
+        if (!targetState || targetState.ownerFactionId === campaign.playerFactionId) return;
+
+        const actionPreview = {
+          attackerFactionId: campaign.playerFactionId,
+          sourceId: sourceState.id,
+          targetId: targetState.id,
+          doctrineKey: playerFaction.doctrine,
+          intensity: sourceState.pressure ?? 50,
+        };
+        const estimate = estimateCampaign(campaign, actionPreview);
+        const predictedShift = predictControlShift(campaign, actionPreview, estimate);
+        const score = predictedShift * 12 + estimate.ratio * 20 + (estimate.sourceConnected ? 6 : -12);
+        if (!best || score > best.score) {
+          best = { sourceState, targetState, estimate, predictedShift, score };
+        }
+      });
+    });
+
+    return best;
+  }
+
   function renderObjective() {
     if (!campaign || !EL.campaignObjective) return;
     const held = campaign.factionsById[campaign.playerFactionId]?.statesOwned || 0;
-    EL.campaignObjective.innerHTML = `<strong>Objective:</strong> forge a single banner over all 48 states. You hold <strong>${held} / 48</strong>.`;
+    const bestAction = bestPlayerFrontierAction();
+    const regionSummary = campaignRegionSummary();
+    const strongestRegion = regionSummary[0];
+    const contestedRegion = [...regionSummary]
+      .filter((entry) => entry.contested > 0)
+      .sort((a, b) => b.contested - a.contested || b.share - a.share)[0];
+
+    const focusLine = bestAction
+      ? `Best next opening: <strong>${bestAction.sourceState.abbr} â†’ ${bestAction.targetState.abbr}</strong> at about ${bestAction.predictedShift >= 0 ? '+' : ''}${bestAction.predictedShift}% control per season.`
+      : 'No clean frontier opening yet. Rebuild a connected border and raise pressure before forcing a new campaign.';
+    const regionLine = strongestRegion
+      ? `Strongest region posture: <strong>${strongestRegion.region}</strong> with ${strongestRegion.held}/${strongestRegion.total} states held.`
+      : '';
+    const contestedLine = contestedRegion
+      ? `Most active contested region: <strong>${contestedRegion.region}</strong> with ${contestedRegion.contested} enemy state${contestedRegion.contested === 1 ? '' : 's'} already under partial pressure.`
+      : 'No enemy region is under sustained partial pressure yet.';
+
+    EL.campaignObjective.innerHTML = `<strong>Objective:</strong> forge a single banner over all 48 states. You hold <strong>${held} / 48</strong>. ${focusLine} ${regionLine} ${contestedLine}`;
   }
 
   // Highlight the current step of the conquest loop in the War Council tracker.
@@ -2449,6 +2522,8 @@
     const standings = Object.values(campaign.factionsById)
       .sort((a, b) => b.statesOwned - a.statesOwned)
       .slice(0, 6);
+    const regionalPosture = campaignRegionSummary().slice(0, 5);
+    const bestAction = bestPlayerFrontierAction();
     const queueRows = campaign.queue.slice(0, 6).map((action, index) => {
       const sourceState = campaign.statesById[action.sourceId];
       const targetState = campaign.statesById[action.targetId];
@@ -2468,11 +2543,17 @@
       `- Treasury: ${Math.round(playerFaction.resources.gold)} gold`,
       `- Levies: ${Math.round(playerFaction.resources.levies)}`,
       `- Rations: ${Math.round(playerFaction.resources.rations)}`,
+      `- Recommended opening: ${bestAction ? `${bestAction.sourceState.abbr} -> ${bestAction.targetState.abbr} at ${bestAction.predictedShift >= 0 ? '+' : ''}${bestAction.predictedShift}% control / season` : 'No clean frontier opening yet'}`,
       '',
       '## Frontline Pressure',
       ...(frontierStates.length
         ? frontierStates.map((stateRecord) => `- ${stateRecord.name} (${stateRecord.abbr}) | control ${Math.round(stateRecord.control[campaign.playerFactionId])}% | pressure ${stateRecord.pressure}% | levies ${Math.round(stateRecord.levies)}`)
         : ['- No frontline territories.']),
+      '',
+      '## Regional Posture',
+      ...(regionalPosture.length
+        ? regionalPosture.map((entry) => `- ${entry.region}: hold ${entry.held}/${entry.total} | contested ${entry.contested} | footprint ${Math.round(entry.share * 100)}%`)
+        : ['- No regional posture available.']),
       '',
       '## Declared Maneuvers',
       ...(queueRows.length ? queueRows : ['- No maneuvers queued.']),
@@ -2945,6 +3026,4 @@
     }
   });
 })();
-
-
 
