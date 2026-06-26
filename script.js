@@ -287,6 +287,7 @@
     settingsOverlay: document.getElementById('settings-overlay'),
     exportSave: document.getElementById('export-save'),
     exportBrief: document.getElementById('export-brief'),
+    saveStatus: document.getElementById('save-status'),
     importSave: document.getElementById('import-save'),
     importFile: document.getElementById('import-file'),
     wipeSave: document.getElementById('wipe-save'),
@@ -766,6 +767,7 @@
       playerFactionId: 'player',
       selectedStateId: startStateId,
       rulerName: cleanRulerName,
+      lastSavedAt: null,
       allocations: { levies: 50, siege: 30, civil: 20 },
       queue: [],
       chronicle: [`Season 1: ${cleanRulerName} of ${factionById.player.name} claims ${playerState.name} and calls banners to war.`],
@@ -2246,6 +2248,20 @@
     renderDoctrineNotes();
   }
 
+  function formatSaveStamp(value) {
+    if (!value) return 'No autosave recorded for this campaign yet.';
+    const stamp = new Date(value);
+    if (Number.isNaN(stamp.getTime())) {
+      return 'Autosave metadata is present, but the timestamp could not be read.';
+    }
+    return `Last autosave: ${stamp.toLocaleString()}`;
+  }
+
+  function renderSaveStatus() {
+    if (!EL.saveStatus || !campaign) return;
+    EL.saveStatus.textContent = formatSaveStamp(campaign.lastSavedAt);
+  }
+
   function renderAll() {
     if (!campaign) return;
     renderHUDMetrics();
@@ -2265,6 +2281,7 @@
     renderObjective();
     renderLoopSteps();
     updateVictoryBanner();
+    renderSaveStatus();
   }
 
   function applyCamera() {
@@ -2586,6 +2603,7 @@
   function wipeSave() {
     localStorage.removeItem(STORAGE_KEY);
     if (campaign) {
+      campaign.lastSavedAt = null;
       campaign.chronicle.unshift(`Season ${campaign.season}: Local campaign save wiped.`);
       renderAll();
     }
@@ -2610,6 +2628,7 @@
       playerFactionId: c.playerFactionId,
       selectedStateId: c.selectedStateId,
       rulerName: sanitizeRulerName(c.rulerName || c.factionsById.player?.rulerName || DEFAULT_RULER_NAME),
+      savedAt: c.lastSavedAt || null,
       cameraX: camera.x,
       cameraY: camera.y,
       cameraScale: camera.scale,
@@ -2745,6 +2764,7 @@
       playerFactionId: raw.playerFactionId || 'player',
       selectedStateId: raw.selectedStateId || mapModel.states[0].id,
       rulerName: sanitizeRulerName(raw.rulerName || factionsById.player.rulerName || DEFAULT_RULER_NAME),
+      lastSavedAt: typeof raw.savedAt === 'string' ? raw.savedAt : null,
       allocations: {
         levies: Number(raw.allocLevies ?? 50),
         siege: Number(raw.allocSiege ?? 30),
@@ -2772,6 +2792,7 @@
 
   function persistCampaign() {
     if (!campaign) return;
+    campaign.lastSavedAt = new Date().toISOString();
     const serialized = serializeCampaign(campaign);
     localStorage.setItem(STORAGE_KEY, JSON.stringify(serialized));
   }
@@ -3026,4 +3047,3 @@
     }
   });
 })();
-

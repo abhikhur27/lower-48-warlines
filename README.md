@@ -38,6 +38,7 @@ Alaska and Hawaii are intentionally reserved for a later expansion update.
 ## Save system
 
 - Auto-save to `localStorage` at the end of every season.
+- Campaign records now surface the last autosave timestamp and include it in exported save files.
 
 ## Honest Label
 
