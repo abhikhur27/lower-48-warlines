@@ -910,6 +910,44 @@
     return seen.has(stateId);
   }
 
+  function findSupplyReconnectRoute(c, factionId, stateId) {
+    const faction = c.factionsById[factionId];
+    if (!faction || !c.statesById[stateId] || !c.statesById[faction.capitalStateId]) return null;
+
+    const queue = [faction.capitalStateId];
+    const seen = new Set([faction.capitalStateId]);
+    const previous = new Map();
+
+    while (queue.length) {
+      const currentId = queue.shift();
+      if (currentId === stateId) break;
+      c.statesById[currentId].neighbors.forEach((neighborId) => {
+        if (seen.has(neighborId) || !c.statesById[neighborId]) return;
+        seen.add(neighborId);
+        previous.set(neighborId, currentId);
+        queue.push(neighborId);
+      });
+    }
+
+    if (!seen.has(stateId)) return null;
+
+    const pathIds = [];
+    let cursor = stateId;
+    while (cursor) {
+      pathIds.push(cursor);
+      cursor = previous.get(cursor);
+    }
+    pathIds.reverse();
+
+    const gapIds = pathIds.slice(1, -1).filter((pathStateId) => c.statesById[pathStateId].ownerFactionId !== factionId);
+    return {
+      pathIds,
+      pathAbbrs: pathIds.map((pathStateId) => c.statesById[pathStateId].abbr),
+      gapIds,
+      gapAbbrs: gapIds.map((pathStateId) => c.statesById[pathStateId].abbr),
+    };
+  }
+
   function visibleStateSet(c) {
     const set = new Set();
     Object.values(c.statesById).forEach((stateRecord) => {
@@ -1578,7 +1616,13 @@
     let advice;
     if (!estimate.sourceConnected) {
       quote = 'The line between disorder and order lies in logistics.';
-      advice = `Your host at <strong>${sourceState.abbr}</strong> is cut off from the capital. Reconnect the supply line or expect attrition to bleed this attack.`;
+      const reconnectRoute = findSupplyReconnectRoute(campaign, campaign.playerFactionId, sourceState.id);
+      const routeCue = reconnectRoute
+        ? reconnectRoute.gapAbbrs.length
+          ? ` Shortest reconnect lane: <strong>${reconnectRoute.pathAbbrs.join(' -> ')}</strong>. Recover ${reconnectRoute.gapAbbrs.join(', ')} first.`
+          : ` Shortest reconnect lane: <strong>${reconnectRoute.pathAbbrs.join(' -> ')}</strong>.`
+        : '';
+      advice = `Your host at <strong>${sourceState.abbr}</strong> is cut off from the capital. Reconnect the supply line or expect attrition to bleed this attack.${routeCue}`;
     } else if (predictedShift <= 0) {
       quote = 'He will win who knows when to fight and when not to fight.';
       advice = `<strong>${sourceState.abbr} → ${targetState.abbr}</strong> stalls (${oddsLabel}). Raise Border Pressure, switch doctrine, or strike a weaker neighbour.`;
@@ -1666,6 +1710,11 @@
     const contestedRegion = [...regionSummary]
       .filter((entry) => entry.contested > 0)
       .sort((a, b) => b.contested - a.contested || b.share - a.share)[0];
+    const disconnectedFrontiers = Object.values(campaign.statesById)
+      .filter((stateRecord) => stateRecord.ownerFactionId === campaign.playerFactionId && stateRecord.frontline && !isSupplyConnected(campaign, campaign.playerFactionId, stateRecord.id));
+    const reconnectLine = disconnectedFrontiers[0]
+      ? findSupplyReconnectRoute(campaign, campaign.playerFactionId, disconnectedFrontiers[0].id)
+      : null;
 
     const focusLine = bestAction
       ? `Best next opening: <strong>${bestAction.sourceState.abbr} â†’ ${bestAction.targetState.abbr}</strong> at about ${bestAction.predictedShift >= 0 ? '+' : ''}${bestAction.predictedShift}% control per season.`
@@ -1676,8 +1725,11 @@
     const contestedLine = contestedRegion
       ? `Most active contested region: <strong>${contestedRegion.region}</strong> with ${contestedRegion.contested} enemy state${contestedRegion.contested === 1 ? '' : 's'} already under partial pressure.`
       : 'No enemy region is under sustained partial pressure yet.';
+    const supplyLine = disconnectedFrontiers.length
+      ? `Supply risk: <strong>${disconnectedFrontiers.length}</strong> frontline state${disconnectedFrontiers.length === 1 ? '' : 's'} cut off.${reconnectLine ? ` Reconnect ${disconnectedFrontiers[0].abbr} via <strong>${reconnectLine.pathAbbrs.join(' -> ')}</strong>.` : ''}`
+      : 'Supply posture: every current frontline is connected to the capital.';
 
-    EL.campaignObjective.innerHTML = `<strong>Objective:</strong> forge a single banner over all 48 states. You hold <strong>${held} / 48</strong>. ${focusLine} ${regionLine} ${contestedLine}`;
+    EL.campaignObjective.innerHTML = `<strong>Objective:</strong> forge a single banner over all 48 states. You hold <strong>${held} / 48</strong>. ${focusLine} ${regionLine} ${contestedLine} ${supplyLine}`;
   }
 
   // Highlight the current step of the conquest loop in the War Council tracker.
@@ -2541,6 +2593,13 @@
       .slice(0, 6);
     const regionalPosture = campaignRegionSummary().slice(0, 5);
     const bestAction = bestPlayerFrontierAction();
+    const disconnectedFrontiers = playerStates
+      .filter((stateRecord) => stateRecord.frontline && !isSupplyConnected(campaign, campaign.playerFactionId, stateRecord.id))
+      .slice(0, 4)
+      .map((stateRecord) => ({
+        stateRecord,
+        reconnect: findSupplyReconnectRoute(campaign, campaign.playerFactionId, stateRecord.id),
+      }));
     const queueRows = campaign.queue.slice(0, 6).map((action, index) => {
       const sourceState = campaign.statesById[action.sourceId];
       const targetState = campaign.statesById[action.targetId];
@@ -2571,6 +2630,11 @@
       ...(regionalPosture.length
         ? regionalPosture.map((entry) => `- ${entry.region}: hold ${entry.held}/${entry.total} | contested ${entry.contested} | footprint ${Math.round(entry.share * 100)}%`)
         : ['- No regional posture available.']),
+      '',
+      '## Supply Risks',
+      ...(disconnectedFrontiers.length
+        ? disconnectedFrontiers.map(({ stateRecord, reconnect }) => `- ${stateRecord.name} (${stateRecord.abbr}) is cut off | ${reconnect ? `reconnect lane ${reconnect.pathAbbrs.join(' -> ')}${reconnect.gapAbbrs.length ? ` | recover ${reconnect.gapAbbrs.join(', ')}` : ''}` : 'no reconnect lane found'}`)
+        : ['- All current frontlines remain connected to the capital.']),
       '',
       '## Declared Maneuvers',
       ...(queueRows.length ? queueRows : ['- No maneuvers queued.']),
