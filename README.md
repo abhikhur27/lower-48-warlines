@@ -53,6 +53,7 @@ Alaska and Hawaii are intentionally reserved for a later expansion update.
 - Export save to structured flat JSON (`factions`, `states`, `stateControl`, `queue`, `chronicle`).
 - Import save from JSON file.
 - Export a Markdown campaign brief with standings, frontier pressure, queued maneuvers, and recent chronicle entries.
+- Campaign footing now classifies the realm as expansion-ready, measured, supply-fragile, or stalled so the objective line and exported brief carry a real strategic diagnosis.
 - Objective line now surfaces the best frontier opening plus strongest / most-contested region posture instead of only raw holdings count.
 - Exported campaign briefs now include a regional posture section and a recommended opening for the next season.
 - Cut-off frontier states now surface a concrete reconnect lane in the advisor and campaign brief, so supply recovery becomes a plan instead of a vague warning.

@@ -1701,10 +1701,52 @@
     return best;
   }
 
+  function campaignFootingSummary() {
+    if (!campaign) return null;
+    const playerFaction = campaign.factionsById[campaign.playerFactionId];
+    const disconnectedFrontiers = Object.values(campaign.statesById)
+      .filter((stateRecord) => stateRecord.ownerFactionId === campaign.playerFactionId && stateRecord.frontline && !isSupplyConnected(campaign, campaign.playerFactionId, stateRecord.id));
+    const bestAction = bestPlayerFrontierAction();
+    const rationReserve = playerFaction.statesOwned > 0
+      ? playerFaction.resources.rations / playerFaction.statesOwned
+      : 0;
+    const levyReserve = playerFaction.statesOwned > 0
+      ? playerFaction.resources.levies / playerFaction.statesOwned
+      : 0;
+
+    if (disconnectedFrontiers.length) {
+      const reconnectLine = findSupplyReconnectRoute(campaign, campaign.playerFactionId, disconnectedFrontiers[0].id);
+      return {
+        label: 'Supply-fragile',
+        detail: `Reconnect ${disconnectedFrontiers[0].abbr}${reconnectLine ? ` via ${reconnectLine.pathAbbrs.join(' -> ')}` : ''} before extending the frontier again.`,
+      };
+    }
+
+    if (!bestAction || bestAction.predictedShift <= 0) {
+      return {
+        label: 'Stalled',
+        detail: 'No clean expansion lane is open right now. Raise pressure or swap doctrine before spending another season.',
+      };
+    }
+
+    if (bestAction.predictedShift >= 11 && rationReserve >= 55 && levyReserve >= 45) {
+      return {
+        label: 'Expansion-ready',
+        detail: `The frontier can push from ${bestAction.sourceState.abbr} into ${bestAction.targetState.abbr} without starving the campaign base.`,
+      };
+    }
+
+    return {
+      label: 'Measured advance',
+      detail: `You have a workable opening at ${bestAction.sourceState.abbr} -> ${bestAction.targetState.abbr}, but reserves still reward a controlled push over a full surge.`,
+    };
+  }
+
   function renderObjective() {
     if (!campaign || !EL.campaignObjective) return;
     const held = campaign.factionsById[campaign.playerFactionId]?.statesOwned || 0;
     const bestAction = bestPlayerFrontierAction();
+    const footing = campaignFootingSummary();
     const regionSummary = campaignRegionSummary();
     const strongestRegion = regionSummary[0];
     const contestedRegion = [...regionSummary]
@@ -1729,7 +1771,11 @@
       ? `Supply risk: <strong>${disconnectedFrontiers.length}</strong> frontline state${disconnectedFrontiers.length === 1 ? '' : 's'} cut off.${reconnectLine ? ` Reconnect ${disconnectedFrontiers[0].abbr} via <strong>${reconnectLine.pathAbbrs.join(' -> ')}</strong>.` : ''}`
       : 'Supply posture: every current frontline is connected to the capital.';
 
-    EL.campaignObjective.innerHTML = `<strong>Objective:</strong> forge a single banner over all 48 states. You hold <strong>${held} / 48</strong>. ${focusLine} ${regionLine} ${contestedLine} ${supplyLine}`;
+    const footingLine = footing
+      ? `Campaign footing: <strong>${footing.label}</strong>. ${footing.detail}`
+      : '';
+
+    EL.campaignObjective.innerHTML = `<strong>Objective:</strong> forge a single banner over all 48 states. You hold <strong>${held} / 48</strong>. ${focusLine} ${footingLine} ${regionLine} ${contestedLine} ${supplyLine}`;
   }
 
   // Highlight the current step of the conquest loop in the War Council tracker.
@@ -2593,6 +2639,7 @@
       .slice(0, 6);
     const regionalPosture = campaignRegionSummary().slice(0, 5);
     const bestAction = bestPlayerFrontierAction();
+    const footing = campaignFootingSummary();
     const disconnectedFrontiers = playerStates
       .filter((stateRecord) => stateRecord.frontline && !isSupplyConnected(campaign, campaign.playerFactionId, stateRecord.id))
       .slice(0, 4)
@@ -2620,6 +2667,7 @@
       `- Levies: ${Math.round(playerFaction.resources.levies)}`,
       `- Rations: ${Math.round(playerFaction.resources.rations)}`,
       `- Recommended opening: ${bestAction ? `${bestAction.sourceState.abbr} -> ${bestAction.targetState.abbr} at ${bestAction.predictedShift >= 0 ? '+' : ''}${bestAction.predictedShift}% control / season` : 'No clean frontier opening yet'}`,
+      `- Campaign footing: ${footing ? `${footing.label} | ${footing.detail}` : 'Unknown'}`,
       '',
       '## Frontline Pressure',
       ...(frontierStates.length
