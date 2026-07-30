@@ -265,6 +265,7 @@
     toggleAuto: document.getElementById('toggle-auto'),
     conquestAdvisor: document.getElementById('conquest-advisor'),
     actionQueue: document.getElementById('action-queue'),
+    lastSeasonReport: document.getElementById('last-season-report'),
     chronicleLog: document.getElementById('chronicle-log'),
     metricLevies: document.getElementById('metric-levies'),
     metricGold: document.getElementById('metric-gold'),
@@ -771,6 +772,7 @@
       allocations: { levies: 50, siege: 30, civil: 20 },
       queue: [],
       chronicle: [`Season 1: ${cleanRulerName} of ${factionById.player.name} claims ${playerState.name} and calls banners to war.`],
+      lastSeasonReport: null,
       factionsById: factionById,
       statesById: stateById,
       vectors: [],
@@ -803,6 +805,15 @@
   function dominantControl(stateRecord) {
     const sorted = Object.entries(stateRecord.control).sort((a, b) => b[1] - a[1]);
     return { factionId: sorted[0][0], share: sorted[0][1] };
+  }
+
+  function escapeHtml(value) {
+    return String(value ?? '')
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
   }
 
   function transferControl(stateRecord, attackerId, shift) {
@@ -1071,6 +1082,98 @@
     return Math.round(clamp(shiftBase - disconnectedPenalty, -11, 20));
   }
 
+  function projectBattleCosts(c, action, estimate) {
+    const source = c.statesById[action.sourceId];
+    const target = c.statesById[action.targetId];
+    const attackerFaction = c.factionsById[action.attackerFactionId];
+    const doctrine = DOCTRINES[action.doctrineKey];
+    if (!source || !target || !attackerFaction || !doctrine || !estimate) {
+      return {
+        attackerLoss: 0,
+        defenderLoss: 0,
+        attackerSupplyCost: 0,
+        defenderSupplyCost: 0,
+      };
+    }
+    const intensity = clamp(action.intensity ?? 50, 0, 100);
+    const intensityFactor = 0.75 + intensity / 100 * 0.5;
+    const shiftBase = (estimate.ratio - 0.86) * 15 * doctrine.siege * attackerFaction.traitEffect.siege * intensityFactor;
+    const disconnectedPenalty = estimate.sourceConnected ? 0 : 3;
+    const predictedShift = Math.round(clamp(shiftBase - disconnectedPenalty, -11, 20));
+    const commitment = Math.max(24, source.levies * 0.4);
+    const attackerLossBase = commitment * (0.12 + 0.21 * (1 / Math.max(estimate.ratio, 0.35)));
+    const defenderLossBase = commitment * (0.1 + 0.24 * Math.max(estimate.ratio, 0.48));
+    const attritionLoss = estimate.sourceConnected ? 0 : commitment * 0.08;
+    return {
+      attackerLoss: Math.max(8, Math.round(attackerLossBase + attritionLoss)),
+      defenderLoss: Math.max(6, Math.round(defenderLossBase * (predictedShift > 0 ? 1.06 : 0.79))),
+      attackerSupplyCost: Math.round(4 + (estimate.sourceConnected ? 2 : 9)),
+      defenderSupplyCost: Math.round(predictedShift > 0 ? 6 : 3),
+    };
+  }
+
+  function playerCampaignSnapshot(c) {
+    const playerId = c.playerFactionId;
+    const playerFaction = c.factionsById[playerId];
+    const holdings = Object.values(c.statesById).filter((stateRecord) => stateRecord.ownerFactionId === playerId);
+    const frontiers = holdings.filter((stateRecord) => stateRecord.frontline);
+    const disconnectedFrontiers = frontiers.filter((stateRecord) => !isSupplyConnected(c, playerId, stateRecord.id));
+    return {
+      holdings: playerFaction.statesOwned,
+      frontierCount: frontiers.length,
+      disconnectedFrontierCount: disconnectedFrontiers.length,
+      levies: Math.round(playerFaction.resources.levies),
+      rations: Math.round(playerFaction.resources.rations),
+      gold: Math.round(playerFaction.resources.gold),
+    };
+  }
+
+  function buildLastSeasonReport(c, seasonResolved, beforeSnapshot, resolvedActions, attritionNotes) {
+    const afterSnapshot = playerCampaignSnapshot(c);
+    const playerActions = resolvedActions.filter((action) => action.attackerFactionId === c.playerFactionId);
+    const playerCaptures = playerActions.filter((action) => action.ownerBefore !== action.ownerAfter && action.ownerAfter === c.playerFactionId).length;
+    const positivePushes = playerActions.filter((action) => action.controlShift > 0).length;
+    const setbacks = playerActions.filter((action) => action.controlShift <= 0).length;
+    const levyLoss = playerActions.reduce((sum, action) => sum + action.attackerLoss, 0);
+    const defenderLoss = playerActions.reduce((sum, action) => sum + action.defenderLoss, 0);
+    const supplySpent = playerActions.reduce((sum, action) => sum + action.attackerSupplyCost, 0);
+    const decisivePlayerAction = [...playerActions].sort((a, b) => {
+      const aScore = (a.ownerAfter === c.playerFactionId ? 100 : 0) + a.controlShift;
+      const bScore = (b.ownerAfter === c.playerFactionId ? 100 : 0) + b.controlShift;
+      return bScore - aScore;
+    })[0] || null;
+
+    return {
+      seasonResolved,
+      holdingsBefore: beforeSnapshot.holdings,
+      holdingsAfter: afterSnapshot.holdings,
+      frontierBefore: beforeSnapshot.frontierCount,
+      frontierAfter: afterSnapshot.frontierCount,
+      disconnectedBefore: beforeSnapshot.disconnectedFrontierCount,
+      disconnectedAfter: afterSnapshot.disconnectedFrontierCount,
+      leviesBefore: beforeSnapshot.levies,
+      leviesAfter: afterSnapshot.levies,
+      rationsBefore: beforeSnapshot.rations,
+      rationsAfter: afterSnapshot.rations,
+      playerActions: playerActions.length,
+      playerCaptures,
+      positivePushes,
+      setbacks,
+      levyLoss,
+      defenderLoss,
+      supplySpent,
+      attritionNotes: attritionNotes.slice(0, 4),
+      decisiveFront: decisivePlayerAction
+        ? {
+            sourceAbbr: decisivePlayerAction.sourceAbbr,
+            targetAbbr: decisivePlayerAction.targetAbbr,
+            controlShift: decisivePlayerAction.controlShift,
+            captured: decisivePlayerAction.ownerAfter === c.playerFactionId,
+          }
+        : null,
+    };
+  }
+
   function queueAttackVector(c, sourceId, targetId, attackerFactionId) {
     const source = c.statesById[sourceId];
     const target = c.statesById[targetId];
@@ -1135,17 +1238,35 @@
     queueAttackVector(c, source.id, target.id, action.attackerFactionId);
 
     const attackerVisible = visibilitySetForFog.has(source.id) || visibilitySetForFog.has(target.id);
+    let note;
     if (!attackerVisible && !attackerFaction.isPlayer) {
-      return `Rumors of fierce fighting spread beyond ${target.region}. The map's ink shifts overnight.`;
+      note = `Rumors of fierce fighting spread beyond ${target.region}. The map's ink shifts overnight.`;
+    } else if (ownerBefore !== ownerAfter) {
+      note = `${attackerFaction.name} captures ${target.name} from ${defenderFaction.name} (${attackerShareBefore.toFixed(1)}% -> ${attackerShareAfter.toFixed(1)}% control).`;
+    } else if (controlShift > 0) {
+      note = `${attackerFaction.name} pushes deeper into ${target.name} (${attackerShareBefore.toFixed(1)}% -> ${attackerShareAfter.toFixed(1)}%).`;
+    } else {
+      note = `${attackerFaction.name} is repelled at ${target.name} after heavy losses.`;
     }
 
-    if (ownerBefore !== ownerAfter) {
-      return `${attackerFaction.name} captures ${target.name} from ${defenderFaction.name} (${attackerShareBefore.toFixed(1)}% -> ${attackerShareAfter.toFixed(1)}% control).`;
-    }
-    if (controlShift > 0) {
-      return `${attackerFaction.name} pushes deeper into ${target.name} (${attackerShareBefore.toFixed(1)}% -> ${attackerShareAfter.toFixed(1)}%).`;
-    }
-    return `${attackerFaction.name} is repelled at ${target.name} after heavy losses.`;
+    return {
+      note,
+      attackerFactionId: action.attackerFactionId,
+      defenderFactionId: defenderFaction.id,
+      sourceId: source.id,
+      sourceAbbr: source.abbr,
+      targetId: target.id,
+      targetAbbr: target.abbr,
+      doctrineKey: action.doctrineKey,
+      controlShift,
+      attackerLoss: Math.round(attackerLoss),
+      defenderLoss: Math.round(defenderLoss),
+      attackerSupplyCost: Math.round(4 + (estimate.sourceConnected ? 2 : 9)),
+      defenderSupplyCost: Math.round(controlShift > 0 ? 6 : 3),
+      ownerBefore,
+      ownerAfter,
+      sourceConnected: estimate.sourceConnected,
+    };
   }
 
   function chooseAIDoctrine(c, faction, sourceState, targetState) {
@@ -1255,6 +1376,8 @@
 
     const seasonNotes = [];
     const visibility = visibleStateSet(campaign);
+    const beforeSnapshot = playerCampaignSnapshot(campaign);
+    const resolvedActions = [];
 
     produceEconomy(campaign);
 
@@ -1263,20 +1386,34 @@
       campaign.queue.length = 0;
       queuedActions.forEach((action) => {
         const result = executeCampaignAction(campaign, action, visibility);
-        if (result) seasonNotes.push(result);
+        if (result) {
+          seasonNotes.push(result.note);
+          resolvedActions.push(result);
+        }
       });
     }
 
     const aiActions = planAIActions(campaign);
     aiActions.forEach((action) => {
       const result = executeCampaignAction(campaign, action, visibility);
-      if (result) seasonNotes.push(result);
+      if (result) {
+        seasonNotes.push(result.note);
+        resolvedActions.push(result);
+      }
     });
 
-    applySupplyAttrition(campaign, visibility).forEach((note) => seasonNotes.push(note));
+    const attritionNotes = applySupplyAttrition(campaign, visibility);
+    attritionNotes.forEach((note) => seasonNotes.push(note));
 
     refreshOwnershipAndFrontline(campaign);
     recalcFactionPower(campaign);
+    campaign.lastSeasonReport = buildLastSeasonReport(
+      campaign,
+      campaign.season,
+      beforeSnapshot,
+      resolvedActions,
+      attritionNotes,
+    );
 
     campaign.season += 1;
     updateCampaignStatus(campaign, seasonNotes);
@@ -1527,16 +1664,21 @@
       const estimate = estimateCampaign(campaign, actionPreview);
       const predicted = predictControlShift(campaign, actionPreview, estimate);
       const predictedText = predicted >= 0 ? `+${predicted}` : String(predicted);
+      const costs = projectBattleCosts(campaign, actionPreview, estimate);
+      const playerShare = targetState.control[campaign.playerFactionId] || 0;
+      const turns = predicted > 0
+        ? Math.ceil(Math.max(1, dominant.share - playerShare + 1) / predicted)
+        : null;
       const option = document.createElement('option');
       option.value = targetState.id;
-      option.textContent = `${targetState.name} (${targetState.abbr}) | Hold ${Math.round(dominant.share)}% ${campaign.factionsById[dominant.factionId].name} | Forecast ${predictedText}%`;
+      option.textContent = `${targetState.name} (${targetState.abbr}) | Hold ${Math.round(dominant.share)}% ${campaign.factionsById[dominant.factionId].name} | Forecast ${predictedText}% | Loss ${costs.attackerLoss} | ${turns ? `~${turns} turn${turns === 1 ? '' : 's'}` : 'stalled'}`;
       EL.targetState.append(option);
     });
   }
   function chronicleListHtml() {
     return campaign.chronicle
       .slice(0, 36)
-      .map((entry) => `<div class="chronicle-item">${entry.replace(/</g, '&lt;').replace(/>/g, '&gt;')}</div>`)
+      .map((entry) => `<div class="chronicle-item">${escapeHtml(entry)}</div>`)
       .join('');
   }
 
@@ -1553,9 +1695,39 @@
       .map((action, index) => {
         const sourceState = campaign.statesById[action.sourceId];
         const targetState = campaign.statesById[action.targetId];
-        return `<div class="queue-item">${index + 1}. ${sourceState.abbr} -> ${targetState.abbr} | ${DOCTRINES[action.doctrineKey].label} | Pressure ${action.intensity}%</div>`;
+        const estimate = estimateCampaign(campaign, action);
+        const predictedShift = predictControlShift(campaign, action, estimate);
+        const costs = projectBattleCosts(campaign, action, estimate);
+        return `<div class="queue-item">${index + 1}. ${sourceState.abbr} -> ${targetState.abbr} | ${DOCTRINES[action.doctrineKey].label} | Pressure ${action.intensity}% | Forecast ${predictedShift >= 0 ? '+' : ''}${predictedShift}% | Est. loss ${costs.attackerLoss}</div>`;
       })
       .join('');
+  }
+
+  function renderLastSeasonReport() {
+    if (!EL.lastSeasonReport) return;
+    const report = campaign?.lastSeasonReport;
+    if (!report) {
+      EL.lastSeasonReport.textContent = 'No season has resolved yet in this campaign.';
+      return;
+    }
+
+    const holdingsDelta = report.holdingsAfter - report.holdingsBefore;
+    const leviesDelta = report.leviesAfter - report.leviesBefore;
+    const rationDelta = report.rationsAfter - report.rationsBefore;
+    const attritionLine = report.attritionNotes.length
+      ? `Attrition: ${escapeHtml(report.attritionNotes.join(' '))}`
+      : 'Attrition: no supply attrition this season.';
+    const decisiveLine = report.decisiveFront
+      ? `Decisive front: <strong>${escapeHtml(report.decisiveFront.sourceAbbr)} -> ${escapeHtml(report.decisiveFront.targetAbbr)}</strong> ${report.decisiveFront.captured ? 'captured the state' : `shifted control ${report.decisiveFront.controlShift >= 0 ? '+' : ''}${report.decisiveFront.controlShift}%`}.`
+      : 'Decisive front: no player maneuver resolved this season.';
+
+    EL.lastSeasonReport.innerHTML = [
+      `<div class="queue-item"><strong>Season ${report.seasonResolved}</strong> | Holdings ${report.holdingsBefore} -> ${report.holdingsAfter} (${holdingsDelta >= 0 ? '+' : ''}${holdingsDelta}) | Frontline cuts ${report.disconnectedBefore} -> ${report.disconnectedAfter}</div>`,
+      `<div class="queue-item">Maneuvers ${report.playerActions} | Captures ${report.playerCaptures} | Favorable pushes ${report.positivePushes} | Setbacks ${report.setbacks}</div>`,
+      `<div class="queue-item">Levies ${report.leviesBefore} -> ${report.leviesAfter} (${leviesDelta >= 0 ? '+' : ''}${leviesDelta}) | Rations ${report.rationsBefore} -> ${report.rationsAfter} (${rationDelta >= 0 ? '+' : ''}${rationDelta}) | Est. committed losses ${report.levyLoss} | Enemy losses ${report.defenderLoss} | Supply spent ${report.supplySpent}</div>`,
+      `<div class="queue-item">${decisiveLine}</div>`,
+      `<div class="queue-item">${attritionLine}</div>`,
+    ].join('');
   }
 
   function counselBox(quote, advice, readout) {
@@ -1602,6 +1774,7 @@
     const estimate = estimateCampaign(campaign, actionPreview);
     const predictedShift = predictControlShift(campaign, actionPreview, estimate);
     const predictedText = predictedShift >= 0 ? `+${predictedShift}%` : `${predictedShift}%`;
+    const costs = projectBattleCosts(campaign, actionPreview, estimate);
 
     const playerShare = targetState.control[campaign.playerFactionId] || 0;
     const dominant = dominantControl(targetState);
@@ -1634,7 +1807,7 @@
       advice = `<strong>${sourceState.abbr} → ${targetState.abbr}</strong> is winnable but ${oddsLabel}${projectedTurns ? `; ~${projectedTurns} season${projectedTurns > 1 ? 's' : ''} to flip` : ''}. Commit only if you can bear the losses.`;
     }
 
-    const readout = `Forecast ${predictedText}/season · Your hold ${playerShare.toFixed(0)}% vs ${dominant.share.toFixed(0)}% (${campaign.factionsById[dominant.factionId].name}) · Supply ${estimate.sourceConnected ? 'connected' : 'CUT'} · ${DOCTRINES[doctrineKey].label}`;
+    const readout = `Forecast ${predictedText}/season | Your hold ${playerShare.toFixed(0)}% vs ${dominant.share.toFixed(0)}% (${campaign.factionsById[dominant.factionId].name}) | ${projectedTurns ? `~${projectedTurns} turn${projectedTurns === 1 ? '' : 's'} to flip` : 'No flip tempo yet'} | Est. levy loss ${costs.attackerLoss} vs ${costs.defenderLoss} | Supply ${estimate.sourceConnected ? 'connected' : 'CUT'} | Spend ${costs.attackerSupplyCost} supply | ${DOCTRINES[doctrineKey].label}`;
 
     EL.conquestAdvisor.innerHTML = counselBox(quote, advice, readout);
   }
@@ -2367,6 +2540,7 @@
     renderSourceTargetOptions();
     renderConquestAdvisor();
     renderQueue();
+    renderLastSeasonReport();
     renderChronicle();
     renderTheater();
     renderTerritories();
@@ -2650,9 +2824,24 @@
     const queueRows = campaign.queue.slice(0, 6).map((action, index) => {
       const sourceState = campaign.statesById[action.sourceId];
       const targetState = campaign.statesById[action.targetId];
-      return `${index + 1}. ${sourceState.abbr} -> ${targetState.abbr} | ${DOCTRINES[action.doctrineKey].label} | Pressure ${action.intensity}%`;
+      const estimate = estimateCampaign(campaign, action);
+      const predictedShift = predictControlShift(campaign, action, estimate);
+      const costs = projectBattleCosts(campaign, action, estimate);
+      return `${index + 1}. ${sourceState.abbr} -> ${targetState.abbr} | ${DOCTRINES[action.doctrineKey].label} | Pressure ${action.intensity}% | Forecast ${predictedShift >= 0 ? '+' : ''}${predictedShift}% | Est. levy loss ${costs.attackerLoss}`;
     });
     const chronicleRows = campaign.chronicle.slice(0, 8).map((entry) => `- ${entry}`);
+    const lastSeasonRows = campaign.lastSeasonReport
+      ? [
+          `- Season ${campaign.lastSeasonReport.seasonResolved} holdings: ${campaign.lastSeasonReport.holdingsBefore} -> ${campaign.lastSeasonReport.holdingsAfter}`,
+          `- Frontline cuts: ${campaign.lastSeasonReport.disconnectedBefore} -> ${campaign.lastSeasonReport.disconnectedAfter}`,
+          `- Maneuvers: ${campaign.lastSeasonReport.playerActions} | captures ${campaign.lastSeasonReport.playerCaptures} | favorable pushes ${campaign.lastSeasonReport.positivePushes} | setbacks ${campaign.lastSeasonReport.setbacks}`,
+          `- Levies: ${campaign.lastSeasonReport.leviesBefore} -> ${campaign.lastSeasonReport.leviesAfter} | rations ${campaign.lastSeasonReport.rationsBefore} -> ${campaign.lastSeasonReport.rationsAfter} | committed losses ${campaign.lastSeasonReport.levyLoss} | enemy losses ${campaign.lastSeasonReport.defenderLoss} | supply spent ${campaign.lastSeasonReport.supplySpent}`,
+          `- Decisive front: ${campaign.lastSeasonReport.decisiveFront ? `${campaign.lastSeasonReport.decisiveFront.sourceAbbr} -> ${campaign.lastSeasonReport.decisiveFront.targetAbbr} ${campaign.lastSeasonReport.decisiveFront.captured ? 'captured the state' : `shifted control ${campaign.lastSeasonReport.decisiveFront.controlShift >= 0 ? '+' : ''}${campaign.lastSeasonReport.decisiveFront.controlShift}%`}` : 'no player maneuver resolved'}`,
+          ...(campaign.lastSeasonReport.attritionNotes.length
+            ? campaign.lastSeasonReport.attritionNotes.map((note) => `- Attrition: ${note}`)
+            : ['- Attrition: no supply attrition this season.']),
+        ]
+      : ['- No resolved-season report recorded yet.'];
 
     return [
       '# Continental Feuds Campaign Brief',
@@ -2686,6 +2875,9 @@
       '',
       '## Declared Maneuvers',
       ...(queueRows.length ? queueRows : ['- No maneuvers queued.']),
+      '',
+      '## Last Season Report',
+      ...lastSeasonRows,
       '',
       '## Continental Standings',
       ...standings.map((faction, index) => `${index + 1}. ${faction.name} | ${faction.statesOwned} states | doctrine ${DOCTRINES[faction.doctrine]?.label || faction.doctrine}`),
@@ -2749,6 +2941,7 @@
       allocCivil: c.allocations.civil,
       queue: c.queue.map((item) => ({ ...item })),
       chronicle: [...c.chronicle],
+      lastSeasonReport: c.lastSeasonReport ? JSON.parse(JSON.stringify(c.lastSeasonReport)) : null,
       factions: Object.values(c.factionsById).map((faction) => ({
         id: faction.id,
         name: faction.name,
@@ -2884,6 +3077,12 @@
       },
       queue: Array.isArray(raw.queue) ? raw.queue.map((item) => ({ ...item })) : [],
       chronicle: Array.isArray(raw.chronicle) ? [...raw.chronicle] : [],
+      lastSeasonReport: raw.lastSeasonReport && typeof raw.lastSeasonReport === 'object'
+        ? {
+            ...raw.lastSeasonReport,
+            attritionNotes: Array.isArray(raw.lastSeasonReport.attritionNotes) ? [...raw.lastSeasonReport.attritionNotes] : [],
+          }
+        : null,
       factionsById,
       statesById: stateRecords,
       vectors: [],

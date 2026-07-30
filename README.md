@@ -57,6 +57,8 @@ Alaska and Hawaii are intentionally reserved for a later expansion update.
 - Objective line now surfaces the best frontier opening plus strongest / most-contested region posture instead of only raw holdings count.
 - Exported campaign briefs now include a regional posture section and a recommended opening for the next season.
 - Cut-off frontier states now surface a concrete reconnect lane in the advisor and campaign brief, so supply recovery becomes a plan instead of a vague warning.
+- Target selection now shows forecasted control shift, estimated levy loss, and projected turns-to-flip before you commit a maneuver.
+- The War Council now keeps a compact last-season report with holdings change, maneuver outcomes, resource swing, decisive front, and attrition notes; the same report persists in saves and exported campaign briefs.
 
 ## Tech stack
 
