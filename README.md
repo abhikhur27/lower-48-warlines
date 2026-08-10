@@ -59,6 +59,8 @@ Alaska and Hawaii are intentionally reserved for a later expansion update.
 - Cut-off frontier states now surface a concrete reconnect lane in the advisor and campaign brief, so supply recovery becomes a plan instead of a vague warning.
 - Target selection now shows forecasted control shift, estimated levy loss, and projected turns-to-flip before you commit a maneuver.
 - The War Council now keeps a compact last-season report with holdings change, maneuver outcomes, resource swing, decisive front, and attrition notes; the same report persists in saves and exported campaign briefs.
+- The maneuver queue now doubles as a compact campaign planner: when empty it recommends the best frontier openings across the map, chooses the strongest doctrine per route, and lets you load a suggestion straight into the War Council selectors.
+- Exported Markdown briefs now include a recommended-maneuvers section so the next-turn plan survives outside the browser.
 
 ## Tech stack
 
@@ -90,6 +92,7 @@ http://127.0.0.1:8100
 Keep the walkthrough to one clean campaign beat:
 
 1. Pick a starting state and one neighboring target.
-2. Show doctrine choice, supply pressure, and the queued campaign.
-3. Advance one season and explain the control shift without touring every panel.
+2. Use the queue's recommended openings to load a suggested maneuver and compare the chosen doctrine to your default field doctrine.
+3. Show doctrine choice, supply pressure, and the queued campaign.
+4. Advance one season and explain the control shift without touring every panel.
 

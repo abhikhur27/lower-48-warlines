@@ -664,6 +664,29 @@ body {
   padding: 0.08rem 0;
 }
 
+.queue-note {
+  color: #4a3727;
+}
+
+.queue-inline-action {
+  margin-left: 0.42rem;
+  border: 1px solid rgba(97, 68, 43, 0.45);
+  background: rgba(126, 92, 55, 0.08);
+  color: #4c2f1f;
+  font: inherit;
+  font-size: 0.74rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  padding: 0.14rem 0.36rem;
+  cursor: pointer;
+}
+
+.queue-inline-action:hover,
+.queue-inline-action:focus-visible {
+  background: rgba(126, 92, 55, 0.16);
+  outline: none;
+}
+
 .theater-title {
   margin-top: 0.3rem;
   font-size: 0.95rem;

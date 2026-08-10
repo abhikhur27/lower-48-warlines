@@ -1686,12 +1686,137 @@
     EL.chronicleLog.innerHTML = chronicleListHtml();
   }
 
+  function routeActionKey(sourceId, targetId) {
+    return `${sourceId}:${targetId}`;
+  }
+
+  function buildPlayerCampaignPlans(limit = 3) {
+    if (!campaign) return [];
+    const queuedKeys = new Set(campaign.queue.map((action) => routeActionKey(action.sourceId, action.targetId)));
+    const candidates = [];
+
+    Object.values(campaign.statesById).forEach((sourceState) => {
+      if (sourceState.ownerFactionId !== campaign.playerFactionId || !sourceState.frontline) return;
+
+      sourceState.neighbors.forEach((targetId) => {
+        const targetState = campaign.statesById[targetId];
+        if (!targetState || targetState.ownerFactionId === campaign.playerFactionId) return;
+        if (queuedKeys.has(routeActionKey(sourceState.id, targetState.id))) return;
+
+        let bestRoutePlan = null;
+        Object.values(DOCTRINES).forEach((doctrine) => {
+          const actionPreview = {
+            attackerFactionId: campaign.playerFactionId,
+            sourceId: sourceState.id,
+            targetId: targetState.id,
+            doctrineKey: doctrine.key,
+            intensity: sourceState.pressure ?? 50,
+          };
+          const estimate = estimateCampaign(campaign, actionPreview);
+          const predictedShift = predictControlShift(campaign, actionPreview, estimate);
+          const costs = projectBattleCosts(campaign, actionPreview, estimate);
+          const playerShare = targetState.control[campaign.playerFactionId] || 0;
+          const dominant = dominantControl(targetState);
+          const turns = predictedShift > 0
+            ? Math.ceil(Math.max(1, dominant.share - playerShare + 1) / predictedShift)
+            : null;
+          const score = predictedShift * 14
+            + estimate.ratio * 18
+            + (estimate.sourceConnected ? 8 : -18)
+            - costs.attackerLoss * 0.75
+            - costs.attackerSupplyCost * 0.28
+            - (turns ?? 6) * 1.4
+            + costs.defenderLoss * 0.24
+            + playerShare * 0.08;
+          const plan = {
+            sourceId: sourceState.id,
+            targetId: targetState.id,
+            sourceAbbr: sourceState.abbr,
+            targetAbbr: targetState.abbr,
+            doctrineKey: doctrine.key,
+            doctrineLabel: doctrine.label,
+            predictedShift,
+            estimate,
+            costs,
+            turns,
+            playerShare,
+            dominant,
+            score,
+          };
+          if (!bestRoutePlan || plan.score > bestRoutePlan.score) {
+            bestRoutePlan = plan;
+          }
+        });
+
+        if (bestRoutePlan) {
+          candidates.push(bestRoutePlan);
+        }
+      });
+    });
+
+    candidates.sort((a, b) => b.score - a.score || b.predictedShift - a.predictedShift || a.costs.attackerLoss - b.costs.attackerLoss);
+
+    const picked = [];
+    const usedSources = new Set();
+    const usedTargets = new Set();
+
+    candidates.forEach((plan) => {
+      if (picked.length >= limit) return;
+      if (usedSources.has(plan.sourceId) || usedTargets.has(plan.targetId)) return;
+      picked.push(plan);
+      usedSources.add(plan.sourceId);
+      usedTargets.add(plan.targetId);
+    });
+
+    if (picked.length < limit) {
+      candidates.forEach((plan) => {
+        if (picked.length >= limit) return;
+        if (picked.some((existing) => existing.sourceId === plan.sourceId && existing.targetId === plan.targetId)) return;
+        picked.push(plan);
+      });
+    }
+
+    return picked;
+  }
+
+  function classifyCampaignPlan(plan) {
+    if (!plan.estimate.sourceConnected) return 'Recover supply first';
+    if (plan.predictedShift >= 12 && plan.estimate.ratio >= 1.18) return 'Breakthrough lane';
+    if (plan.predictedShift >= 8) return 'Strong pressure';
+    if (plan.predictedShift > 0) return 'Measured grind';
+    return 'Risky probe';
+  }
+
+  function loadCampaignPlan(sourceId, targetId, doctrineKey) {
+    if (!campaign || !campaign.statesById[sourceId] || !campaign.statesById[targetId] || !DOCTRINES[doctrineKey]) return;
+    campaign.selectedStateId = sourceId;
+    EL.sourceState.value = sourceId;
+    renderTargetOptions(sourceId);
+    EL.targetState.value = targetId;
+    EL.campaignDoctrine.value = doctrineKey;
+    campaign.chronicle.unshift(`Season ${campaign.season}: War Council loaded recommended maneuver ${campaign.statesById[sourceId].abbr} -> ${campaign.statesById[targetId].abbr}.`);
+    campaign.chronicle = campaign.chronicle.slice(0, 200);
+    renderAll();
+  }
+
   function renderQueue() {
+    const recommendedPlans = buildPlayerCampaignPlans(3);
     if (!campaign.queue.length) {
-      EL.actionQueue.textContent = 'No maneuvers declared. Use the War Council above to plan an attack.';
+      if (!recommendedPlans.length) {
+        EL.actionQueue.textContent = 'No maneuvers declared. Use the War Council above to plan an attack.';
+        return;
+      }
+      EL.actionQueue.innerHTML = [
+        '<div class="queue-item"><strong>No maneuvers declared.</strong> The War Council recommends these openings:</div>',
+        ...recommendedPlans.map((plan, index) => {
+          const predictedText = `${plan.predictedShift >= 0 ? '+' : ''}${plan.predictedShift}%`;
+          const turnsText = plan.turns ? `~${plan.turns} season${plan.turns === 1 ? '' : 's'} to flip` : 'no flip tempo yet';
+          return `<div class="queue-item"><strong>${index + 1}. ${escapeHtml(plan.sourceAbbr)} -> ${escapeHtml(plan.targetAbbr)}</strong> | ${escapeHtml(classifyCampaignPlan(plan))} | ${escapeHtml(plan.doctrineLabel)} | Forecast ${predictedText} | Loss ${plan.costs.attackerLoss} | ${turnsText} <button type="button" class="queue-inline-action" data-load-plan="1" data-source-id="${plan.sourceId}" data-target-id="${plan.targetId}" data-doctrine-key="${plan.doctrineKey}">Load</button></div>`;
+        }),
+      ].join('');
       return;
     }
-    EL.actionQueue.innerHTML = campaign.queue
+    const queuedRows = campaign.queue
       .map((action, index) => {
         const sourceState = campaign.statesById[action.sourceId];
         const targetState = campaign.statesById[action.targetId];
@@ -1699,8 +1824,11 @@
         const predictedShift = predictControlShift(campaign, action, estimate);
         const costs = projectBattleCosts(campaign, action, estimate);
         return `<div class="queue-item">${index + 1}. ${sourceState.abbr} -> ${targetState.abbr} | ${DOCTRINES[action.doctrineKey].label} | Pressure ${action.intensity}% | Forecast ${predictedShift >= 0 ? '+' : ''}${predictedShift}% | Est. loss ${costs.attackerLoss}</div>`;
-      })
-      .join('');
+      });
+    const reserveRow = recommendedPlans[0]
+      ? `<div class="queue-item queue-note"><strong>Best reserve opening:</strong> ${escapeHtml(recommendedPlans[0].sourceAbbr)} -> ${escapeHtml(recommendedPlans[0].targetAbbr)} | ${escapeHtml(recommendedPlans[0].doctrineLabel)} | Forecast ${recommendedPlans[0].predictedShift >= 0 ? '+' : ''}${recommendedPlans[0].predictedShift}% | Loss ${recommendedPlans[0].costs.attackerLoss} <button type="button" class="queue-inline-action" data-load-plan="1" data-source-id="${recommendedPlans[0].sourceId}" data-target-id="${recommendedPlans[0].targetId}" data-doctrine-key="${recommendedPlans[0].doctrineKey}">Load</button></div>`
+      : '';
+    EL.actionQueue.innerHTML = [...queuedRows, reserveRow].filter(Boolean).join('');
   }
 
   function renderLastSeasonReport() {
@@ -2829,6 +2957,8 @@
       const costs = projectBattleCosts(campaign, action, estimate);
       return `${index + 1}. ${sourceState.abbr} -> ${targetState.abbr} | ${DOCTRINES[action.doctrineKey].label} | Pressure ${action.intensity}% | Forecast ${predictedShift >= 0 ? '+' : ''}${predictedShift}% | Est. levy loss ${costs.attackerLoss}`;
     });
+    const recommendedPlans = buildPlayerCampaignPlans(3);
+    const recommendedRows = recommendedPlans.map((plan, index) => `${index + 1}. ${plan.sourceAbbr} -> ${plan.targetAbbr} | ${classifyCampaignPlan(plan)} | ${plan.doctrineLabel} | Forecast ${plan.predictedShift >= 0 ? '+' : ''}${plan.predictedShift}% | Est. levy loss ${plan.costs.attackerLoss}${plan.turns ? ` | ~${plan.turns} season${plan.turns === 1 ? '' : 's'} to flip` : ''}`);
     const chronicleRows = campaign.chronicle.slice(0, 8).map((entry) => `- ${entry}`);
     const lastSeasonRows = campaign.lastSeasonReport
       ? [
@@ -2875,6 +3005,9 @@
       '',
       '## Declared Maneuvers',
       ...(queueRows.length ? queueRows : ['- No maneuvers queued.']),
+      '',
+      '## Recommended Maneuvers',
+      ...(recommendedRows.length ? recommendedRows : ['- No reserve opening stands out beyond the current queue.']),
       '',
       '## Last Season Report',
       ...lastSeasonRows,
@@ -3275,6 +3408,16 @@
 
     EL.queueCampaign.addEventListener('click', () => {
       queueCampaignAction();
+    });
+
+    EL.actionQueue.addEventListener('click', (event) => {
+      const button = event.target.closest('[data-load-plan]');
+      if (!button) return;
+      loadCampaignPlan(
+        button.getAttribute('data-source-id'),
+        button.getAttribute('data-target-id'),
+        button.getAttribute('data-doctrine-key'),
+      );
     });
 
     EL.advanceSeason.addEventListener('click', () => {
