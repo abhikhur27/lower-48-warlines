@@ -60,6 +60,8 @@ Alaska and Hawaii are intentionally reserved for a later expansion update.
 - Target selection now shows forecasted control shift, estimated levy loss, and projected turns-to-flip before you commit a maneuver.
 - The War Council now keeps a compact last-season report with holdings change, maneuver outcomes, resource swing, decisive front, and attrition notes; the same report persists in saves and exported campaign briefs.
 - The maneuver queue now doubles as a compact campaign planner: when empty it recommends the best frontier openings across the map, chooses the strongest doctrine per route, and lets you load a suggestion straight into the War Council selectors.
+- Campaign recommendations now prefer supplied frontiers whenever one is available; isolated attacks remain visible only when the realm has no connected opening and are labeled as recovery work.
+- The forecast and recommendation engine lives in `campaign-planner.js`, with deterministic regression fixtures covering multiple opening realms, queued routes, stable ranking, and late-game supply splits.
 - Exported Markdown briefs now include a recommended-maneuvers section so the next-turn plan survives outside the browser.
 
 ## Tech stack
@@ -80,6 +82,13 @@ Then open:
 
 ```text
 http://127.0.0.1:8100
+```
+
+## Verification
+
+```bash
+npm run check
+npm test
 ```
 
 ## Repository role

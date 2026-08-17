@@ -1,0 +1,10 @@
+{
+  "name": "continental-feuds",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Deterministic campaign-planner checks for the Continental Feuds browser game.",
+  "scripts": {
+    "check": "node --check campaign-planner.js && node --check script.js",
+    "test": "node --test"
+  }
+}

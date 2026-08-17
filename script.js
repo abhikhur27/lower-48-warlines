@@ -28,68 +28,11 @@
     PA: 'East', NY: 'East', VT: 'East', NH: 'East', ME: 'East', NJ: 'East', DE: 'East', MD: 'East', CT: 'East', RI: 'East', MA: 'East',
   };
 
-  const DOCTRINES = {
-    fabian: {
-      key: 'fabian',
-      label: 'Fabian Attrition',
-      attack: 0.92,
-      defense: 1.17,
-      siege: 0.96,
-      supply: 1.15,
-      counters: ['encirclement'],
-      note: 'Deliberate withdrawals that bleed invaders and preserve supply depth.',
-    },
-    feigned: {
-      key: 'feigned',
-      label: 'Feigned Retreat',
-      attack: 1.09,
-      defense: 0.98,
-      siege: 0.99,
-      supply: 0.98,
-      counters: ['siege', 'march'],
-      note: 'Bait-and-counter warfare with sharper offensive swings.',
-    },
-    siege: {
-      key: 'siege',
-      label: 'Siegeworks',
-      attack: 1.02,
-      defense: 1.04,
-      siege: 1.18,
-      supply: 0.94,
-      counters: ['shieldwall'],
-      note: 'Engineer-heavy campaigns that accelerate control transfer in hard targets.',
-    },
-    shieldwall: {
-      key: 'shieldwall',
-      label: 'Pike Shieldwall',
-      attack: 0.95,
-      defense: 1.22,
-      siege: 0.9,
-      supply: 1.02,
-      counters: ['feigned'],
-      note: 'Disciplined defensive ranks blunt raids and stabilize contested borders.',
-    },
-    encirclement: {
-      key: 'encirclement',
-      label: 'Encirclement Drive',
-      attack: 1.15,
-      defense: 0.9,
-      siege: 1.05,
-      supply: 0.9,
-      counters: ['march'],
-      note: 'Fast flank pressure that can collapse enemy fronts if supply holds.',
-    },
-    march: {
-      key: 'march',
-      label: 'Scorched March',
-      attack: 1.03,
-      defense: 0.96,
-      siege: 1.08,
-      supply: 1.08,
-      counters: ['fabian'],
-      note: 'Hard campaigning that preserves momentum through harsh logistics.',
-    },
-  };
+  const {
+    DOCTRINES,
+    TERRAIN_MODIFIERS,
+    createCampaignPlanner,
+  } = window.ContinentalFeudsCampaignPlanner;
 
   const STATE_BUFF_TEMPLATES = [
     {
@@ -213,13 +156,7 @@
     East: 'coastal',
   };
 
-  const TERRAIN_MODIFIERS = {
-    plains: { defense: 1.0, supply: 1.03, prosperity: 1.03 },
-    coastal: { defense: 1.06, supply: 1.01, prosperity: 1.05 },
-    forest: { defense: 1.1, supply: 0.98, prosperity: 1.0 },
-    hills: { defense: 1.12, supply: 0.93, prosperity: 0.98 },
-    mountain: { defense: 1.17, supply: 0.88, prosperity: 0.96 },
-  };
+  const campaignPlanner = createCampaignPlanner();
 
   const MAP_STAGE = document.getElementById('map-stage');
   const SVG = document.getElementById('war-map');
@@ -445,16 +382,6 @@
       effect,
       summary: `${template.summary} (+${power}% ${template.statLabel}).`,
     };
-  }
-
-  function doctrineAdvantage(attackerKey, defenderKey) {
-    if (attackerKey === defenderKey) return 1;
-    const attacker = DOCTRINES[attackerKey];
-    const defender = DOCTRINES[defenderKey];
-    if (!attacker || !defender) return 1;
-    if ((attacker.counters || []).includes(defenderKey)) return 1.12;
-    if ((defender.counters || []).includes(attackerKey)) return 0.89;
-    return 1;
   }
 
   async function loadMap() {
@@ -893,32 +820,7 @@
   }
 
   function isSupplyConnected(c, factionId, stateId) {
-    const faction = c.factionsById[factionId];
-    if (!faction || faction.statesOwned <= 0) return false;
-    if (faction.capitalStateId === stateId) return true;
-
-    const queue = [faction.capitalStateId];
-    const seen = new Set([faction.capitalStateId]);
-
-    while (queue.length) {
-      const currentId = queue.shift();
-      const currentState = c.statesById[currentId];
-      currentState.neighbors.forEach((neighborId) => {
-        if (seen.has(neighborId)) return;
-        const neighborState = c.statesById[neighborId];
-        if (neighborState.ownerFactionId !== factionId) return;
-        if (neighborId === stateId) {
-          seen.add(neighborId);
-          queue.length = 0;
-          return;
-        }
-        seen.add(neighborId);
-        queue.push(neighborId);
-      });
-      if (seen.has(stateId)) return true;
-    }
-
-    return seen.has(stateId);
+    return campaignPlanner.isSupplyConnected(c, factionId, stateId);
   }
 
   function findSupplyReconnectRoute(c, factionId, stateId) {
@@ -1027,89 +929,15 @@
   }
 
   function estimateCampaign(c, action) {
-    const source = c.statesById[action.sourceId];
-    const target = c.statesById[action.targetId];
-    const attackerFaction = c.factionsById[action.attackerFactionId];
-    const defenderFaction = c.factionsById[target.ownerFactionId];
-    const attackerDoctrine = DOCTRINES[action.doctrineKey];
-    const defenderDoctrineKey = defenderFaction.doctrine;
-    const defenderDoctrine = DOCTRINES[defenderDoctrineKey];
-
-    const sourceConnected = isSupplyConnected(c, attackerFaction.id, source.id);
-    const supplyFactor = sourceConnected ? 1.0 : 0.7;
-    const rationPressure = clamp((attackerFaction.resources.rations + source.supply * 2) / Math.max(attackerFaction.statesOwned * 170, 1), 0.56, 1.28);
-    const doctrineEdge = doctrineAdvantage(action.doctrineKey, defenderDoctrineKey);
-    const terrainDefense = TERRAIN_MODIFIERS[target.terrain].defense;
-    const sourceBuff = source.buff?.effect || {};
-    const targetBuff = target.buff?.effect || {};
-    const attackBuff = sourceBuff.siege || 1;
-    const defenseBuff = targetBuff.defense || 1;
-    const supplyBuff = sourceBuff.supply || 1;
-
-    const attackPower = source.levies
-      * attackerDoctrine.attack
-      * attackerFaction.traitEffect.levy
-      * attackerDoctrine.supply
-      * supplyFactor
-      * rationPressure
-      * doctrineEdge
-      * attackBuff
-      * supplyBuff;
-
-    const defensePower = target.levies
-      * defenderDoctrine.defense
-      * defenderFaction.traitEffect.defense
-      * terrainDefense
-      * (1 + target.fort * 0.06)
-      * defenseBuff;
-
-    return {
-      ratio: attackPower / Math.max(defensePower, 1),
-      sourceConnected,
-      defenderDoctrineKey,
-    };
+    return campaignPlanner.estimateCampaign(c, action);
   }
 
   function predictControlShift(c, action, estimate) {
-    const source = c.statesById[action.sourceId];
-    const attackerFaction = c.factionsById[action.attackerFactionId];
-    const doctrine = DOCTRINES[action.doctrineKey];
-    if (!source || !attackerFaction || !doctrine || !estimate) return 0;
-    const intensity = clamp(action.intensity ?? source.pressure ?? 50, 0, 100);
-    const intensityFactor = 0.75 + intensity / 100 * 0.5;
-    const shiftBase = (estimate.ratio - 0.86) * 15 * doctrine.siege * attackerFaction.traitEffect.siege * intensityFactor;
-    const disconnectedPenalty = estimate.sourceConnected ? 0 : 3;
-    return Math.round(clamp(shiftBase - disconnectedPenalty, -11, 20));
+    return campaignPlanner.predictControlShift(c, action, estimate);
   }
 
   function projectBattleCosts(c, action, estimate) {
-    const source = c.statesById[action.sourceId];
-    const target = c.statesById[action.targetId];
-    const attackerFaction = c.factionsById[action.attackerFactionId];
-    const doctrine = DOCTRINES[action.doctrineKey];
-    if (!source || !target || !attackerFaction || !doctrine || !estimate) {
-      return {
-        attackerLoss: 0,
-        defenderLoss: 0,
-        attackerSupplyCost: 0,
-        defenderSupplyCost: 0,
-      };
-    }
-    const intensity = clamp(action.intensity ?? 50, 0, 100);
-    const intensityFactor = 0.75 + intensity / 100 * 0.5;
-    const shiftBase = (estimate.ratio - 0.86) * 15 * doctrine.siege * attackerFaction.traitEffect.siege * intensityFactor;
-    const disconnectedPenalty = estimate.sourceConnected ? 0 : 3;
-    const predictedShift = Math.round(clamp(shiftBase - disconnectedPenalty, -11, 20));
-    const commitment = Math.max(24, source.levies * 0.4);
-    const attackerLossBase = commitment * (0.12 + 0.21 * (1 / Math.max(estimate.ratio, 0.35)));
-    const defenderLossBase = commitment * (0.1 + 0.24 * Math.max(estimate.ratio, 0.48));
-    const attritionLoss = estimate.sourceConnected ? 0 : commitment * 0.08;
-    return {
-      attackerLoss: Math.max(8, Math.round(attackerLossBase + attritionLoss)),
-      defenderLoss: Math.max(6, Math.round(defenderLossBase * (predictedShift > 0 ? 1.06 : 0.79))),
-      attackerSupplyCost: Math.round(4 + (estimate.sourceConnected ? 2 : 9)),
-      defenderSupplyCost: Math.round(predictedShift > 0 ? 6 : 3),
-    };
+    return campaignPlanner.projectBattleCosts(c, action, estimate);
   }
 
   function playerCampaignSnapshot(c) {
@@ -1686,105 +1514,12 @@
     EL.chronicleLog.innerHTML = chronicleListHtml();
   }
 
-  function routeActionKey(sourceId, targetId) {
-    return `${sourceId}:${targetId}`;
-  }
-
   function buildPlayerCampaignPlans(limit = 3) {
-    if (!campaign) return [];
-    const queuedKeys = new Set(campaign.queue.map((action) => routeActionKey(action.sourceId, action.targetId)));
-    const candidates = [];
-
-    Object.values(campaign.statesById).forEach((sourceState) => {
-      if (sourceState.ownerFactionId !== campaign.playerFactionId || !sourceState.frontline) return;
-
-      sourceState.neighbors.forEach((targetId) => {
-        const targetState = campaign.statesById[targetId];
-        if (!targetState || targetState.ownerFactionId === campaign.playerFactionId) return;
-        if (queuedKeys.has(routeActionKey(sourceState.id, targetState.id))) return;
-
-        let bestRoutePlan = null;
-        Object.values(DOCTRINES).forEach((doctrine) => {
-          const actionPreview = {
-            attackerFactionId: campaign.playerFactionId,
-            sourceId: sourceState.id,
-            targetId: targetState.id,
-            doctrineKey: doctrine.key,
-            intensity: sourceState.pressure ?? 50,
-          };
-          const estimate = estimateCampaign(campaign, actionPreview);
-          const predictedShift = predictControlShift(campaign, actionPreview, estimate);
-          const costs = projectBattleCosts(campaign, actionPreview, estimate);
-          const playerShare = targetState.control[campaign.playerFactionId] || 0;
-          const dominant = dominantControl(targetState);
-          const turns = predictedShift > 0
-            ? Math.ceil(Math.max(1, dominant.share - playerShare + 1) / predictedShift)
-            : null;
-          const score = predictedShift * 14
-            + estimate.ratio * 18
-            + (estimate.sourceConnected ? 8 : -18)
-            - costs.attackerLoss * 0.75
-            - costs.attackerSupplyCost * 0.28
-            - (turns ?? 6) * 1.4
-            + costs.defenderLoss * 0.24
-            + playerShare * 0.08;
-          const plan = {
-            sourceId: sourceState.id,
-            targetId: targetState.id,
-            sourceAbbr: sourceState.abbr,
-            targetAbbr: targetState.abbr,
-            doctrineKey: doctrine.key,
-            doctrineLabel: doctrine.label,
-            predictedShift,
-            estimate,
-            costs,
-            turns,
-            playerShare,
-            dominant,
-            score,
-          };
-          if (!bestRoutePlan || plan.score > bestRoutePlan.score) {
-            bestRoutePlan = plan;
-          }
-        });
-
-        if (bestRoutePlan) {
-          candidates.push(bestRoutePlan);
-        }
-      });
-    });
-
-    candidates.sort((a, b) => b.score - a.score || b.predictedShift - a.predictedShift || a.costs.attackerLoss - b.costs.attackerLoss);
-
-    const picked = [];
-    const usedSources = new Set();
-    const usedTargets = new Set();
-
-    candidates.forEach((plan) => {
-      if (picked.length >= limit) return;
-      if (usedSources.has(plan.sourceId) || usedTargets.has(plan.targetId)) return;
-      picked.push(plan);
-      usedSources.add(plan.sourceId);
-      usedTargets.add(plan.targetId);
-    });
-
-    if (picked.length < limit) {
-      candidates.forEach((plan) => {
-        if (picked.length >= limit) return;
-        if (picked.some((existing) => existing.sourceId === plan.sourceId && existing.targetId === plan.targetId)) return;
-        picked.push(plan);
-      });
-    }
-
-    return picked;
+    return campaignPlanner.buildPlayerCampaignPlans(campaign, limit);
   }
 
   function classifyCampaignPlan(plan) {
-    if (!plan.estimate.sourceConnected) return 'Recover supply first';
-    if (plan.predictedShift >= 12 && plan.estimate.ratio >= 1.18) return 'Breakthrough lane';
-    if (plan.predictedShift >= 8) return 'Strong pressure';
-    if (plan.predictedShift > 0) return 'Measured grind';
-    return 'Risky probe';
+    return campaignPlanner.classifyCampaignPlan(plan);
   }
 
   function loadCampaignPlan(sourceId, targetId, doctrineKey) {
